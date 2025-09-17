@@ -8,6 +8,22 @@ The Art Institute of Chicago API is **completely free and requires no API key**.
 - **Status**: ✅ Ready to use immediately
 - **What it provides**: Access to 50,000+ artworks, artist information, and detailed descriptions
 
+## Metropolitan Museum of Art API ✅ READY TO USE
+
+The Met Museum API is **completely free and requires no API key**. It's now integrated and working!
+
+- **Documentation**: https://metmuseum.github.io/
+- **Status**: ✅ Ready to use immediately
+- **What it provides**: Access to 470,000+ artworks, detailed provenance, exhibition history, and historical context
+
+## Wikipedia API ✅ READY TO USE
+
+The Wikipedia API is **completely free and requires no API key**. It's now integrated for educational content!
+
+- **Documentation**: https://en.wikipedia.org/api/rest_v1/
+- **Status**: ✅ Ready to use immediately
+- **What it provides**: Artist biographies, art movement information, and educational context
+
 ## Optional: Vision APIs (for image analysis)
 
 ### Google Vision API
@@ -40,6 +56,17 @@ The Art Institute of Chicago API is **completely free and requires no API key**.
    ```
 5. **What it provides**: AI-powered artistic analysis, historical context, educational insights, and enhanced descriptions
 
+### Adobe Color API (NEW! 🎨)
+1. Go to [Adobe Developer Console](https://developer.adobe.com/console/)
+2. Create a new project
+3. Add the Color API service
+4. Generate an API key
+5. Add to your `.env` file:
+   ```
+   VITE_ADOBE_COLOR_API_KEY=your_actual_key_here
+   ```
+6. **What it provides**: Advanced color palette analysis, color harmony detection, and color theory insights
+
 ## Quick Start
 
 1. Copy `env.example` to `.env`:
@@ -54,8 +81,11 @@ The Art Institute of Chicago API is **completely free and requires no API key**.
 ## Current Status
 
 - ✅ Art Institute API: Working (no key needed)
+- ✅ Metropolitan Museum API: Working (no key needed) - **NEW!**
+- ✅ Wikipedia API: Working (no key needed) - **NEW!**
 - ⚠️ Google Vision API: Optional (add key to `.env`)
 - ⚠️ Microsoft Vision API: Optional (add key to `.env`)
-- 🚀 OpenAI API: Optional (add key to `.env`) - **NEW!**
+- 🚀 OpenAI API: Optional (add key to `.env`)
+- 🎨 Adobe Color API: Optional (add key to `.env`) - **NEW!**
 
-The demo will work with just the Art Institute API, but adding vision APIs and OpenAI will provide much more detailed and educational image analysis with AI-powered insights.
+The demo will work with the free APIs (Art Institute, Met Museum, Wikipedia), but adding vision APIs, OpenAI, and Adobe Color will provide much more detailed and educational image analysis with AI-powered insights and advanced color theory.

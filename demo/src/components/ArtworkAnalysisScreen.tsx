@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { ArrowLeft, Palette, Eye, AlertCircle } from 'lucide-react'
+import { ArrowLeft, Palette, Eye, AlertCircle, Droplets, BookOpen, MessageCircle, Target, Lightbulb, Search } from 'lucide-react'
 import './ArtworkAnalysisScreen.css'
 import apiService, { ArtworkAnalysis } from '../services/apiService'
 
@@ -59,7 +59,6 @@ const ArtworkAnalysisScreen: React.FC = () => {
     }
   }, [imageUri, imageFile])
 
-
   if (loading) {
     return (
       <div className="analysis-screen">
@@ -97,12 +96,10 @@ const ArtworkAnalysisScreen: React.FC = () => {
         )}
 
 
-        {/* Artwork Information */}
+        {/* Artwork Analysis */}
         {artworkInfo && (
           <div className="info-container">
-            <h2 className="title">{artworkInfo.title}</h2>
-            <p className="artist">by {artworkInfo.artist}</p>
-            <p className="period">{artworkInfo.period}</p>
+            <h2 className="title">Artwork Analysis</h2>
             
             {/* Analysis source and confidence */}
             <div className="analysis-meta">
@@ -115,31 +112,9 @@ const ArtworkAnalysisScreen: React.FC = () => {
             </div>
             
             <div className="section">
-              <h3 className="section-title">About this artwork</h3>
+              <h3 className="section-title">Visual Analysis</h3>
               <p className="description">{artworkInfo.description}</p>
             </div>
-
-            <div className="section">
-              <h3 className="section-title">Key Techniques</h3>
-              {(artworkInfo.techniques || []).map((technique, index) => (
-                <div key={index} className="list-item">
-                  <Palette size={16} color="#2196F3" />
-                  <span className="list-text">{technique}</span>
-                </div>
-              ))}
-            </div>
-
-            <div className="section">
-              <h3 className="section-title">Visual Elements</h3>
-              {(artworkInfo.elements || []).map((element, index) => (
-                <div key={index} className="list-item">
-                  <Eye size={16} color="#2196F3" />
-                  <span className="list-text">{element}</span>
-                </div>
-              ))}
-            </div>
-
-
           </div>
         )}
       </div>

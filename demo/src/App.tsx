@@ -2,6 +2,7 @@ import React from 'react'
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import HomeScreen from './components/HomeScreen'
 import ArtworkAnalysisScreen from './components/ArtworkAnalysisScreen'
+import ApiStatusScreen from './components/ApiStatusScreen'
 
 function App() {
   return (
@@ -15,6 +16,7 @@ function App() {
         <Routes>
           <Route path="/" element={<HomeScreen />} />
           <Route path="/analysis" element={<ArtworkAnalysisScreen />} />
+          <Route path="/api-status" element={<ApiStatusScreen />} />
         </Routes>
       </div>
     </Router>

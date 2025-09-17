@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Home, Upload, Palette, Eye } from 'lucide-react'
+import { Home, Upload, Palette, Eye, Settings } from 'lucide-react'
 import './HomeScreen.css'
 
 const HomeScreen: React.FC = () => {
@@ -28,9 +28,16 @@ const HomeScreen: React.FC = () => {
 
   return (
     <div className="home-screen">
-      {/* Header with house icon */}
+      {/* Header with house icon and settings */}
       <div className="header">
         <Home size={32} color="#2196F3" />
+        <button 
+          onClick={() => navigate('/api-status')} 
+          className="settings-button"
+          title="API Status"
+        >
+          <Settings size={24} color="#2196F3" />
+        </button>
       </div>
 
       {/* Welcome text */}
