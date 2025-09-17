@@ -209,10 +209,10 @@ class ArtworkAnalysisService {
       const colors = visionResults.flatMap(r => r.colors || []).join(', ')
       const text = visionResults.flatMap(r => r.text || []).join(', ')
 
-      const prompt = `Provide a clear, concise educational analysis of this artwork for art students.
+      const prompt = `Analyze this artwork with astute artistic observations that are succinct and engaging. Focus on meaningful insights that reveal the artist's skill and intention.
 
-Technical Data:
-- Labels: ${labels}
+What I discovered:
+- Key elements: ${labels}
 - Objects: ${objects}
 - Colors: ${colors}
 - Text: ${text}
@@ -220,16 +220,16 @@ Technical Data:
 
 Return JSON format:
 {
-  "artisticInsights": ["Key technique insight", "Visual element insight", "Artistic principle insight"],
-  "technicalAnalysis": "Brief analysis of techniques and materials used",
-  "compositionNotes": "Analysis of composition and visual structure",
-  "colorTheory": "Color relationships and palette analysis",
-  "themes": "Main themes and meanings",
-  "educationalValue": "What students can learn from this artwork",
-  "styleAnalysis": "Artistic style and movement context"
+  "artisticInsights": ["Concise observation about technique or visual element", "Another insightful observation about composition or style", "Third observation about artistic choices"],
+  "technicalAnalysis": "Clear explanation of the technical approach and methods used",
+  "compositionNotes": "How the artist guides the viewer's eye and creates visual flow",
+  "colorTheory": "Analysis of color relationships and their emotional impact",
+  "themes": "The underlying concepts or ideas the artwork explores",
+  "educationalValue": "What students can learn from studying this work",
+  "styleAnalysis": "How the artistic approach serves the work's purpose"
 }
 
-Keep responses concise but educational. Focus on clear, actionable insights.`
+Write with professional insight, avoiding excessive enthusiasm. Be precise, informative, and engaging without being overly effusive.`
 
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
@@ -242,7 +242,7 @@ Keep responses concise but educational. Focus on clear, actionable insights.`
           messages: [
             {
               role: 'system',
-              content: 'You are an art educator. Provide clear, concise educational analysis focused on techniques, composition, color theory, and themes. Keep responses brief but informative for art students.'
+              content: 'You are an experienced art educator who provides astute, succinct, and engaging artistic observations. Focus on meaningful insights that reveal the artist\'s skill and intention. Be precise, informative, and engaging without being overly effusive. Avoid excessive exclamation points and forced enthusiasm.'
             },
             {
               role: 'user',
@@ -294,11 +294,7 @@ Keep responses concise but educational. Focus on clear, actionable insights.`
 
   // Main analysis function that tries multiple APIs
   async analyzeArtwork(imageFile: File): Promise<ArtworkAnalysis> {
-    console.log('Starting artwork analysis... (v2.0)', { 
-      fileName: imageFile.name, 
-      fileSize: imageFile.size, 
-      fileType: imageFile.type 
-    })
+    console.log('🎨 Analyzing artwork:', imageFile.name)
     
     // Check if any API keys are configured (Art Institute doesn't need a key)
     const hasVisionApiKeys = this.apiKeys.googleVision || this.apiKeys.microsoftVision
@@ -309,18 +305,9 @@ Keep responses concise but educational. Focus on clear, actionable insights.`
       throw new Error('No APIs available. Please set up at least one API key to analyze artwork.')
     }
 
-    console.log('API keys status:', {
-      googleVision: !!this.apiKeys.googleVision,
-      microsoftVision: !!this.apiKeys.microsoftVision,
-      microsoftEndpoint: !!this.apiKeys.microsoftEndpoint,
-      artInstitute: true, // Always available
-      openai: hasOpenAI
-    })
-
     try {
       // Convert image to base64 for both APIs
       const imageBase64 = await this.fileToBase64(imageFile)
-      console.log('Image converted to base64, length:', imageBase64.length)
       
       // Try both APIs and combine results
       const results: ArtworkAnalysis[] = []
@@ -329,13 +316,9 @@ Keep responses concise but educational. Focus on clear, actionable insights.`
       // Try Google Vision first
       if (this.apiKeys.googleVision) {
         try {
-          console.log('Trying Google Vision API...')
           const googleResult = await this.analyzeWithGoogleVision(imageBase64)
-          console.log('Google Vision API result:', googleResult)
-          console.log('Google Vision labels:', googleResult.labels)
           visionResults.push(googleResult)
           results.push(this.processVisionResults(googleResult, 'Google Vision'))
-          console.log('Google Vision analysis added to results')
         } catch (error) {
           console.warn('Google Vision API failed:', error)
         }
@@ -344,12 +327,9 @@ Keep responses concise but educational. Focus on clear, actionable insights.`
       // Try Microsoft Vision
       if (this.apiKeys.microsoftVision && this.apiKeys.microsoftEndpoint) {
         try {
-          console.log('Trying Microsoft Vision API...')
           const microsoftResult = await this.analyzeWithMicrosoftVision(imageBase64)
-          console.log('Microsoft Vision API result:', microsoftResult)
           visionResults.push(microsoftResult)
           results.push(this.processVisionResults(microsoftResult, 'Microsoft Vision'))
-          console.log('Microsoft Vision analysis added to results')
         } catch (error) {
           console.warn('Microsoft Vision API failed:', error)
         }
@@ -358,18 +338,15 @@ Keep responses concise but educational. Focus on clear, actionable insights.`
       // Try Art Institute API for additional context (always available, no key needed)
       if (results.length > 0) {
         try {
-          console.log('Trying Art Institute API...')
           // Use the first result's title or labels to search for similar artworks
           const firstResult = results[0]
           const searchQuery = firstResult.title || firstResult.techniques?.[0] || 'artwork'
           
           const artInstituteResults = await this.searchArtwork(searchQuery)
-          console.log('Art Institute API result:', artInstituteResults)
           
           if (artInstituteResults.length > 0) {
             // Use the first result from Art Institute as additional context
             results.push(artInstituteResults[0])
-            console.log('Art Institute analysis added to results')
           }
         } catch (error) {
           console.warn('Art Institute API failed:', error)
@@ -380,14 +357,11 @@ Keep responses concise but educational. Focus on clear, actionable insights.`
       let openAIAnalysis: OpenAIAnalysisResult | null = null
       if (this.apiKeys.openai && visionResults.length > 0) {
         try {
-          console.log('Trying OpenAI API...')
           const artworkContext = results.length > 0 ? 
             `Title: ${results[0].title}, Style: ${results[0].style}, Period: ${results[0].period}` : 
             'Artwork analysis'
           
           openAIAnalysis = await this.analyzeWithOpenAI(visionResults, artworkContext)
-          console.log('OpenAI API result:', openAIAnalysis)
-          console.log('OpenAI analysis added to results')
         } catch (error) {
           console.warn('OpenAI API failed:', error)
         }
@@ -396,20 +370,15 @@ Keep responses concise but educational. Focus on clear, actionable insights.`
       // If no vision APIs worked but we have Art Institute, try a generic search
       if (results.length === 0 && hasArtInstitute) {
         try {
-          console.log('Trying Art Institute API with generic search...')
           const artInstituteResults = await this.searchArtwork('artwork')
-          console.log('Art Institute generic search result:', artInstituteResults)
           
           if (artInstituteResults.length > 0) {
             results.push(artInstituteResults[0])
-            console.log('Art Institute generic analysis added to results')
           }
         } catch (error) {
           console.warn('Art Institute generic search failed:', error)
         }
       }
-      
-      console.log('Total results collected:', results.length)
       
       if (results.length === 0) {
         throw new Error('All APIs failed. Please check your API keys and try again.')
@@ -417,7 +386,7 @@ Keep responses concise but educational. Focus on clear, actionable insights.`
       
       // Combine results from multiple APIs
       const combinedResult = this.combineAnalysisResults(results, openAIAnalysis)
-      console.log('Final combined result:', combinedResult)
+      console.log('✅ Analysis complete')
       return combinedResult
       
     } catch (error) {
@@ -661,39 +630,39 @@ Keep responses concise but educational. Focus on clear, actionable insights.`
     const objects = result.objects || []
     const colors = result.colors || []
     
-    // Educational descriptions focused on artistic principles
+    // Astute and engaging descriptions that reveal artistic insight
     if (objects.includes('bridge') || labels.some(label => label.toLowerCase().includes('bridge'))) {
-      return `This artwork demonstrates the study of atmospheric perspective and light effects. Bridge scenes have been a popular subject in art history, particularly during the 19th century when artists were exploring new ways to capture the effects of light and atmosphere. These compositions offer artists an excellent opportunity to explore how light interacts with water, creating reflections and atmospheric depth. Notice how the artist has captured the interplay between solid architectural forms and the fluid, ever-changing surface of water. This type of composition teaches us about the importance of light in creating mood and depth in landscape painting, and represents a fundamental challenge in representational art.`
+      return `The artist demonstrates masterful control of atmospheric perspective, using the bridge as both a structural element and a device to guide the viewer's eye through the composition. The interplay between solid architecture and fluid reflections creates visual tension and depth.`
     }
     
     if (labels.includes('skeleton') || labels.includes('skull') || labels.includes('bone')) {
-      return `This anatomical study showcases fundamental principles of figure drawing and human structure. Skeletal studies have been a cornerstone of art education since the Renaissance, when artists began to systematically study human anatomy to improve their representational skills. These studies are essential in art education as they teach artists to understand the underlying framework that supports all human form. Notice how the artist has rendered the three-dimensional structure of bones, creating volume through careful attention to light and shadow. This type of study develops an artist's understanding of proportion, structure, and the relationship between form and space - skills that are fundamental to all figurative art.`
+      return `This anatomical study reveals the artist's understanding of underlying structure. The careful rendering of bone structure demonstrates both technical skill and knowledge of human anatomy, essential for creating convincing figures.`
     } 
     
     if (labels.includes('portrait') || labels.includes('face')) {
-      return `This portrait study demonstrates the artist's exploration of human expression and facial structure. Portrait painting has been one of the most challenging and respected genres in art history, requiring mastery of both technical skills and psychological insight. Portrait work requires careful observation of proportions, the play of light across facial features, and the subtle variations in skin tone and texture. Notice how the artist has captured the unique characteristics of the subject while maintaining a sense of the underlying bone structure that gives the face its form. This type of study teaches us about the balance between individual likeness and artistic interpretation.`
+      return `The artist captures not merely physical likeness but psychological presence. The careful modeling of form through light and shadow creates a sense of three-dimensionality and emotional depth.`
     } 
     
     if (labels.includes('landscape') || labels.includes('nature')) {
-      return `This landscape study explores the relationship between natural forms and atmospheric conditions. Landscape painting became increasingly important in art history, particularly as artists moved away from purely religious and historical subjects to explore the natural world. This genre teaches artists about perspective, color temperature, and how to create depth through the manipulation of value and color. Notice how the artist has handled the transition from foreground to background, using techniques like atmospheric perspective to create a sense of space and distance. This type of study helps develop an understanding of how to represent three-dimensional space on a two-dimensional surface.`
+      return `The composition employs atmospheric perspective to create convincing depth, with elements becoming less distinct and cooler in tone as they recede. The artist demonstrates understanding of how light behaves across vast distances.`
     } 
     
     if (labels.includes('flower') || labels.includes('bouquet')) {
-      return `This floral study demonstrates the artist's attention to natural form, color relationships, and composition. Still life painting with flowers has been a popular subject throughout art history, offering artists the opportunity to study natural forms in a controlled setting. This genre teaches artists about color harmony, the importance of value relationships, and how to create visual interest through the arrangement of organic forms. Notice how the artist has captured the delicate textures and varied shapes of the flowers while maintaining a balanced composition. This type of study helps develop skills in observation, color mixing, and compositional arrangement.`
+      return `This still life demonstrates careful observation of natural forms and their interaction with light. The artist's attention to botanical detail and textural variety creates visual interest while maintaining compositional harmony.`
     }
     
-    // Create educational descriptions for general artworks
-    let description = `This artwork presents an excellent study of ${labels.slice(0, 3).join(', ')}. `
+    // Create astute descriptions for general artworks
+    let description = `This work demonstrates thoughtful composition and technical skill. The artist effectively captures ${labels.slice(0, 2).join(' and ')} through careful observation and deliberate artistic choices. `
     
     if (objects.length > 0) {
-      description += `The composition thoughtfully incorporates ${objects.slice(0, 2).join(' and ')}, demonstrating the artist's understanding of how different elements work together to create visual harmony. `
+      description += `The arrangement of ${objects.slice(0, 2).join(' and ')} creates visual balance and guides the viewer's attention through the composition. `
     }
     
     if (colors.length > 0) {
-      description += `The color palette emphasizes ${colors.slice(0, 2).join(' and ')}, showing how color relationships can create mood and guide the viewer's eye through the composition. `
+      description += `The color palette (${colors.slice(0, 2).join(' and ')}) establishes mood and reinforces the work's thematic content. `
     }
     
-    description += `This type of study helps develop fundamental artistic skills including observation, composition, and the understanding of how visual elements interact to create meaning and emotional impact.`
+    description += `The overall effect demonstrates the artist's technical proficiency and aesthetic sensibility.`
     
     return description
   }
@@ -704,41 +673,41 @@ Keep responses concise but educational. Focus on clear, actionable insights.`
     const colors = result.colors || []
     
     if (labels.some(label => label.toLowerCase().includes('oil'))) {
-      techniques.push('Oil painting - allows for rich, layered colors and smooth blending')
+      techniques.push('Oil painting technique with smooth color transitions and rich impasto')
     }
     if (labels.some(label => label.toLowerCase().includes('watercolor'))) {
-      techniques.push('Watercolor - creates transparency and luminosity through layering')
+      techniques.push('Watercolor layering with controlled transparency and luminosity')
     }
     if (labels.some(label => label.toLowerCase().includes('brush'))) {
-      techniques.push('Expressive brushwork - visible strokes that add energy and movement')
+      techniques.push('Varied brushwork creating textural interest and directional movement')
     }
     if (labels.some(label => label.toLowerCase().includes('texture'))) {
-      techniques.push('Textural variety - different surface qualities create visual interest')
+      techniques.push('Textural variety enhancing visual and tactile interest')
     }
     
     // Add color technique analysis
     if (colors.length > 2) {
-      techniques.push('Color harmony - multiple colors working together to create visual balance')
+      techniques.push('Sophisticated color harmony demonstrating understanding of color theory')
     }
     if (colors.some(color => color.toLowerCase().includes('warm'))) {
-      techniques.push('Warm color palette - creates energy and draws attention')
+      techniques.push('Strategic use of warm colors to create focal points and emotional warmth')
     }
     if (colors.some(color => color.toLowerCase().includes('cool'))) {
-      techniques.push('Cool color palette - creates calm and recedes in space')
+      techniques.push('Cool color palette establishing atmospheric depth and spatial recession')
     }
     
     // Add composition techniques based on content
     if (labels.some(label => label.toLowerCase().includes('portrait'))) {
-      techniques.push('Portrait composition - careful attention to facial proportions and expression')
+      techniques.push('Accurate facial proportions and anatomical structure')
     }
     if (labels.some(label => label.toLowerCase().includes('landscape'))) {
-      techniques.push('Landscape perspective - creating depth through atmospheric and linear perspective')
+      techniques.push('Atmospheric perspective creating convincing spatial depth')
     }
     if (labels.some(label => label.toLowerCase().includes('skeleton') || label.toLowerCase().includes('bone'))) {
-      techniques.push('Anatomical study - understanding underlying structure and form')
+      techniques.push('Precise anatomical knowledge and structural understanding')
     }
     
-    return techniques.length > 0 ? techniques : ['Fundamental artistic techniques']
+    return techniques.length > 0 ? techniques : ['Technical proficiency evident in artistic execution']
   }
 
   private identifyElements(result: ImageAnalysisResult): string[] {
@@ -748,43 +717,43 @@ Keep responses concise but educational. Focus on clear, actionable insights.`
     const objects = result.objects || []
     
     if (colors.length > 0) {
-      elements.push(`Color Theory: Dominant colors (${colors.slice(0, 3).join(', ')}) create mood and guide the eye`)
+      elements.push(`Strategic color palette featuring ${colors.slice(0, 3).join(', ')} that establishes mood and visual hierarchy`)
     }
     
     if (labels.some(label => label.toLowerCase().includes('line'))) {
-      elements.push('Line Quality: Strong linear elements create structure and movement')
+      elements.push('Controlled line work that defines form and creates directional movement')
     }
     
     if (labels.some(label => label.toLowerCase().includes('shape'))) {
-      elements.push('Shape Relationships: Geometric and organic forms create visual balance')
+      elements.push('Balanced interplay between geometric and organic shapes creating visual rhythm')
     }
     
     if (labels.some(label => label.toLowerCase().includes('texture'))) {
-      elements.push('Surface Texture: Varied textural qualities add visual interest and depth')
+      elements.push('Varied textural elements that enhance visual interest and tactile quality')
     }
     
     // Add specific artistic elements based on content
     if (labels.some(label => label.toLowerCase().includes('portrait'))) {
-      elements.push('Facial Proportions: Careful attention to anatomical structure and expression')
+      elements.push('Convincing facial structure demonstrating understanding of human anatomy')
     }
     
     if (labels.some(label => label.toLowerCase().includes('landscape'))) {
-      elements.push('Atmospheric Perspective: Use of color and value to create depth and distance')
+      elements.push('Atmospheric perspective creating convincing spatial depth and distance')
     }
     
     if (labels.some(label => label.toLowerCase().includes('skeleton') || label.toLowerCase().includes('bone'))) {
-      elements.push('Anatomical Structure: Understanding of bone structure and three-dimensional form')
+      elements.push('Precise anatomical rendering revealing structural knowledge and technical skill')
     }
     
     if (objects.length > 0) {
-      elements.push(`Compositional Elements: Strategic placement of ${objects.slice(0, 2).join(' and ')} creates visual hierarchy`)
+      elements.push(`Strategic placement of ${objects.slice(0, 2).join(' and ')} creates visual balance and compositional flow`)
     }
     
     // Add general artistic principles
-    elements.push('Value Relationships: Light and shadow create form and depth')
-    elements.push('Compositional Balance: Arrangement of elements creates visual harmony')
+    elements.push('Effective use of light and shadow to model form and create three-dimensionality')
+    elements.push('Compositional balance that guides the viewer\'s eye through the work')
     
-    return elements.length > 0 ? elements : ['Fundamental visual elements']
+    return elements.length > 0 ? elements : ['Well-executed visual elements demonstrating artistic skill']
   }
 
 
