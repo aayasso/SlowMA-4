@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Vision API Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .error { color: red; background: #ffebee; padding: 10px; border-radius: 4px; margin: 10px 0; }
+        .success { color: green; background: #e8f5e8; padding: 10px; border-radius: 4px; margin: 10px 0; }
+        .info { color: blue; background: #e3f2fd; padding: 10px; border-radius: 4px; margin: 10px 0; }
+        button { padding: 10px 20px; margin: 10px 0; background: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
+        input[type="file"] { margin: 10px 0; }
+        #results { margin-top: 20px; padding: 10px; border: 1px solid #ddd; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Google Vision API Test</h1>
+        
+        <div class="info">
+            <strong>Setup Instructions:</strong>
+            <ol>
+                <li>Create a <code>.env</code> file in the demo directory</li>
+                <li>Add your Google Vision API key: <code>VITE_GOOGLE_VISION_API_KEY=your_key_here</code></li>
+                <li>Restart the development server</li>
+            </ol>
+        </div>
+
+        <div>
+            <label for="imageFile">Select an image to analyze:</label>
+            <input type="file" id="imageFile" accept="image/*">
+        </div>
+
+        <button onclick="testGoogleVisionAPI()" id="testBtn">Test Google Vision API</button>
+        
+        <div id="status"></div>
+        <div id="results"></div>
+    </div>
+
+    <script>
+        async function testGoogleVisionAPI() {
+            const fileInput = document.getElementById('imageFile');
+            const statusDiv = document.getElementById('status');
+            const resultsDiv = document.getElementById('results');
+            const testBtn = document.getElementById('testBtn');
+            
+            if (!fileInput.files[0]) {
+                statusDiv.innerHTML = '<div class="error">Please select an image file first.</div>';
+                return;
+            }
+
+            testBtn.disabled = true;
+            statusDiv.innerHTML = '<div class="info">Testing Google Vision API...</div>';
+            resultsDiv.innerHTML = '';
+
+            try {
+                // Get API key from environment (this would normally come from Vite)
+                const apiKey = prompt('Enter your Google Vision API key:');
+                if (!apiKey) {
+                    throw new Error('API key is required');
+                }
+
+                // Convert file to base64
+                const file = fileInput.files[0];
+                const base64 = await fileToBase64(file);
+                
+                // Call Google Vision API
+                const response = await fetch(
+                    `https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`,
+                    {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            requests: [
+                                {
+                                    image: {
+                                        content: base64.split(',')[1]
+                                    },
+                                    features: [
+                                        { type: 'LABEL_DETECTION', maxResults: 10 },
+                                        { type: 'OBJECT_LOCALIZATION', maxResults: 10 },
+                                        { type: 'TEXT_DETECTION', maxResults: 10 },
+                                        { type: 'IMAGE_PROPERTIES', maxResults: 1 },
+                                        { type: 'FACE_DETECTION', maxResults: 10 },
+                                        { type: 'SAFE_SEARCH_DETECTION', maxResults: 1 }
+                                    ]
+                                }
+                            ]
+                        })
+                    }
+                );
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`HTTP ${response.status}: ${errorText}`);
+                }
+
+                const data = await response.json();
+                
+                if (data.error) {
+                    throw new Error(`API Error: ${data.error.message}`);
+                }
+
+                const result = data.responses[0];
+                
+                if (result.error) {
+                    throw new Error(`Processing Error: ${result.error.message}`);
+                }
+
+                // Display results
+                statusDiv.innerHTML = '<div class="success">✅ Google Vision API is working correctly!</div>';
+                
+                let resultsHTML = '<h3>Analysis Results:</h3>';
+                
+                if (result.labelAnnotations) {
+                    resultsHTML += '<h4>Labels:</h4><ul>';
+                    result.labelAnnotations.forEach(label => {
+                        resultsHTML += `<li>${label.description} (${(label.score * 100).toFixed(1)}%)</li>`;
+                    });
+                    resultsHTML += '</ul>';
+                }
+
+                if (result.localizedObjectAnnotations) {
+                    resultsHTML += '<h4>Objects:</h4><ul>';
+                    result.localizedObjectAnnotations.forEach(obj => {
+                        resultsHTML += `<li>${obj.name} (${(obj.score * 100).toFixed(1)}%)</li>`;
+                    });
+                    resultsHTML += '</ul>';
+                }
+
+                if (result.imagePropertiesAnnotation?.dominantColors?.colors) {
+                    resultsHTML += '<h4>Dominant Colors:</h4><ul>';
+                    result.imagePropertiesAnnotation.dominantColors.colors.forEach((color, index) => {
+                        const rgb = `rgb(${color.color.red}, ${color.color.green}, ${color.color.blue})`;
+                        resultsHTML += `<li style="color: ${rgb}">Color ${index + 1}: ${rgb}</li>`;
+                    });
+                    resultsHTML += '</ul>';
+                }
+
+                if (result.faceAnnotations) {
+                    resultsHTML += `<h4>Faces Detected: ${result.faceAnnotations.length}</h4>`;
+                }
+
+                if (result.safeSearchAnnotation) {
+                    resultsHTML += '<h4>Content Safety:</h4><ul>';
+                    resultsHTML += `<li>Adult Content: ${result.safeSearchAnnotation.adult}</li>`;
+                    resultsHTML += `<li>Violence: ${result.safeSearchAnnotation.violence}</li>`;
+                    resultsHTML += `<li>Racy Content: ${result.safeSearchAnnotation.racy}</li>`;
+                    resultsHTML += '</ul>';
+                }
+
+                resultsDiv.innerHTML = resultsHTML;
+
+            } catch (error) {
+                console.error('Test error:', error);
+                statusDiv.innerHTML = `<div class="error">❌ Error: ${error.message}</div>`;
+                
+                // Provide troubleshooting tips
+                let troubleshooting = '<h4>Troubleshooting Tips:</h4><ul>';
+                if (error.message.includes('403')) {
+                    troubleshooting += '<li>Check if your API key is valid and has the Vision API enabled</li>';
+                    troubleshooting += '<li>Verify billing is set up for your Google Cloud project</li>';
+                } else if (error.message.includes('CORS')) {
+                    troubleshooting += '<li>CORS error: Google Vision API may not support direct browser requests</li>';
+                    troubleshooting += '<li>Consider using a proxy server or backend API</li>';
+                } else if (error.message.includes('400')) {
+                    troubleshooting += '<li>Bad request: Check if the image format is supported</li>';
+                    troubleshooting += '<li>Ensure the base64 encoding is correct</li>';
+                }
+                troubleshooting += '</ul>';
+                
+                resultsDiv.innerHTML = troubleshooting;
+            } finally {
+                testBtn.disabled = false;
+            }
+        }
+
+        function fileToBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = error => reject(error);
+            });
+        }
+    </script>
+</body>
+</html>
