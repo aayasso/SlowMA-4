@@ -808,22 +808,30 @@ Write with depth and sophistication while maintaining accessibility. Provide sub
       }
 
       
-      // Try Art Institute API for additional context (always available, no key needed)
-      if (results.length > 0) {
-        try {
-          // Use the first result's title or labels to search for similar artworks
-          const firstResult = results[0]
-          const searchQuery = firstResult.title || firstResult.techniques?.[0] || 'artwork'
-          
-          const artInstituteResults = await this.searchArtwork(searchQuery)
-          
-          if (artInstituteResults.length > 0) {
-            // Use the first result from Art Institute as additional context
-            results.push(artInstituteResults[0])
-          }
-        } catch (error) {
-          console.warn('Art Institute API failed:', error)
+      // Enrich with public art collection searches using detected context
+      const enrichmentQuery = (() => {
+        if (results.length > 0) {
+          const r = results[0]
+          return r.title || r.artist || r.style || r.techniques?.[0] || 'artwork'
         }
+        return imageFile.name.split('.')[0] || 'artwork'
+      })()
+
+      try {
+        const [artInstituteResults, rijksResults, harvardResults, artSearchResults] = await Promise.all([
+          this.searchArtwork(enrichmentQuery).catch(() => []),
+          this.searchRijksmuseumArtwork(enrichmentQuery).catch(() => []),
+          this.searchHarvardArtwork(enrichmentQuery).catch(() => []),
+          this.searchArtSearch(enrichmentQuery).catch(() => [])
+        ])
+
+        // Add top items from each source to results for summary combination
+        if (artInstituteResults.length > 0) results.push(artInstituteResults[0])
+        if (rijksResults.length > 0) results.push(rijksResults[0])
+        if (harvardResults.length > 0) results.push(harvardResults[0])
+        if (artSearchResults.length > 0) results.push(artSearchResults[0])
+      } catch (error) {
+        console.warn('Public collection enrichment failed:', error)
       }
 
       // Try Met Museum API for historical context (now with improved CORS handling)
@@ -1452,7 +1460,7 @@ Write with depth and sophistication while maintaining accessibility. Provide sub
   }
 
 
-  // Generate comprehensive analysis summary from all sources (exactly 20 informative sentences)
+  // Generate comprehensive analysis summary from all sources (exactly 40 informative sentences)
   private generateAnalysisSummary(
     results: ArtworkAnalysis[], 
     openAIAnalysis?: OpenAIAnalysisResult | null,
@@ -1622,13 +1630,13 @@ Write with depth and sophistication while maintaining accessibility. Provide sub
       summary.push("This artwork represents a meaningful contribution to visual culture, demonstrating the power of art to communicate, inspire, and transform.")
     }
     
-    // Ensure exactly 20 sentences by padding if necessary
-    while (summary.length < 20) {
+    // Ensure exactly 40 sentences by padding if necessary
+    while (summary.length < 40) {
       summary.push("The artwork continues to reveal new insights upon repeated viewing, demonstrating the depth of artistic expression.")
     }
     
-    // Join exactly 20 sentences
-    return summary.slice(0, 20).join(' ')
+    // Join exactly 40 sentences
+    return summary.slice(0, 40).join(' ')
   }
 
   // Combine results from multiple APIs for richer analysis
