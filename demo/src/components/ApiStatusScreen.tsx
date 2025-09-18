@@ -208,6 +208,7 @@ const ApiStatusScreen: React.FC = () => {
             <li>Rijksmuseum API - Dutch art collection (FREE)</li>
             <li>Metropolitan Museum of Art - Extensive art database (FREE)</li>
             <li>Wikipedia API - Educational content (FREE)</li>
+            <li>Art Search API - Unified art search across collections</li>
           </ul>
         </div>
       </div>

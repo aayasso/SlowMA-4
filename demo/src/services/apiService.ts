@@ -137,7 +137,8 @@ class ArtworkAnalysisService {
     openai: import.meta.env.VITE_OPENAI_API_KEY || '',
     rijksmuseum: import.meta.env.VITE_RIJKSMUSEUM_API_KEY || '',
     harvard: import.meta.env.VITE_HARVARD_ART_MUSEUMS_API_KEY || '',
-    wikipedia: '' // Wikipedia API is free, no key needed
+    wikipedia: '', // Wikipedia API is free, no key needed
+    artsearch: import.meta.env.VITE_ARTSEARCH_API_KEY || ''
   }
 
   // Google Vision API integration
@@ -432,6 +433,71 @@ class ArtworkAnalysisService {
     }
   }
 
+  // Art Search API integration (https://artsearch.io/)
+  async searchArtSearch(query: string): Promise<ArtworkAnalysis[]> {
+    if (!this.apiKeys.artsearch) {
+      console.warn('Art Search API key not configured')
+      return []
+    }
+
+    // Attempt direct request, then fall back to CORS proxy if needed
+    const endpoints = [
+      // Primary (assumed) endpoint. Replace with exact path if docs specify differently.
+      { url: `https://api.artsearch.io/v1/search?query=${encodeURIComponent(query)}&limit=5`, useProxy: false },
+      { url: `https://api.artsearch.io/search?query=${encodeURIComponent(query)}&limit=5`, useProxy: false },
+    ]
+
+    // Helper to perform a fetch with both common auth methods
+    const fetchWithAuth = async (targetUrl: string): Promise<Response> => {
+      // Try X-API-KEY header first
+      let response = await fetch(targetUrl, {
+        headers: { 'X-API-KEY': this.apiKeys.artsearch }
+      })
+      if (response.status === 401 || response.status === 403) {
+        // Try Authorization Bearer fallback
+        response = await fetch(targetUrl, {
+          headers: { Authorization: `Bearer ${this.apiKeys.artsearch}` }
+        })
+      }
+      return response
+    }
+
+    for (const endpoint of endpoints) {
+      try {
+        const response = await fetchWithAuth(endpoint.url)
+        if (!response.ok) {
+          continue
+        }
+        const data = await response.json()
+
+        // Normalize common shapes. We expect an array of items under one of these keys.
+        const items = data.items || data.results || data.data || []
+        if (!Array.isArray(items) || items.length === 0) {
+          continue
+        }
+
+        const mapped: ArtworkAnalysis[] = items.slice(0, 5).map((item: any) => ({
+          title: item.title || item.name || 'Untitled',
+          artist: item.artist || item.creator || item.author || 'Unknown Artist',
+          period: item.date || item.dating || item.period || '',
+          style: item.style || item.movement || item.classification || '',
+          description: item.description || item.summary || '',
+          techniques: item.techniques || item.medium ? [item.medium] : [],
+          source: 'Art Search',
+          confidence: 0.8
+        }))
+
+        return mapped
+      } catch (error) {
+        // Try next endpoint
+        continue
+      }
+    }
+
+    console.warn('Art Search API did not return results for query:', query)
+    return []
+  }
+
 
 
   // Find similar artworks for comparison
@@ -475,6 +541,10 @@ class ArtworkAnalysisService {
           // Search Harvard Art Museums
           const harvardResults = await this.searchHarvardArtwork(term)
           similarArtworks.push(...harvardResults.slice(0, 2))
+
+          // Aggregated Art Search
+          const aggregated = await this.searchArtSearch(term)
+          similarArtworks.push(...aggregated.slice(0, 2))
         } catch (error) {
           // Silently fail to avoid console spam
         }
@@ -676,7 +746,8 @@ Write with depth and sophistication while maintaining accessibility. Provide sub
       rijksmuseum: true, // Always available (no key required)
       harvard: !!this.apiKeys.harvard && this.apiKeys.harvard !== 'your_harvard_art_museums_api_key_here',
       metMuseum: true, // Always available
-      wikipedia: true // Always available
+      wikipedia: true, // Always available
+      artSearch: !!this.apiKeys.artsearch
     }
 
     console.log('🔍 API Status:', status)
