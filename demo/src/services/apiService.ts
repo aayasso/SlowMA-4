@@ -265,8 +265,8 @@ class ArtworkAnalysisService {
   // Metropolitan Museum of Art API integration (no API key required)
   async searchMetMuseumArtwork(query: string): Promise<MetMuseumArtwork[]> {
     try {
-      // Use a more reliable CORS proxy
-      const proxyUrl = 'https://api.allorigins.win/raw?url='
+      // Use vite proxy to avoid CORS during development
+      const proxyUrl = '/proxy/allorigins/raw?url='
       const targetUrl = `https://collectionapi.metmuseum.org/public/collection/v1/search?q=${encodeURIComponent(query)}&hasImages=true&isOnView=true`
       
       const response = await fetch(proxyUrl + encodeURIComponent(targetUrl))
@@ -297,7 +297,7 @@ class ArtworkAnalysisService {
   }
 
   private async fetchMetMuseumDetails(objectIDs: number[]): Promise<MetMuseumArtwork[]> {
-    const proxyUrl = 'https://api.allorigins.win/raw?url='
+    const proxyUrl = '/proxy/allorigins/raw?url='
     const artworkPromises = objectIDs.map(async (objectID: number) => {
       try {
         const artworkUrl = `https://collectionapi.metmuseum.org/public/collection/v1/objects/${objectID}`
@@ -350,7 +350,7 @@ class ArtworkAnalysisService {
     try {
       // Use the Rijksmuseum data API endpoint
       const response = await fetch(
-        `https://data.rijksmuseum.nl/search/collection?q=${encodeURIComponent(query)}&ps=5`
+        `/proxy/rijks/search/collection?q=${encodeURIComponent(query)}&ps=5`
       )
 
       if (!response.ok) {
@@ -390,7 +390,7 @@ class ArtworkAnalysisService {
       const artworks = await Promise.all(artworkPromises)
       return artworks.filter(artwork => artwork !== null)
     } catch (error) {
-      console.warn('Rijksmuseum API error:', error)
+      // Quietly skip Rijksmuseum failures (often 400 for complex queries)
       return []
     }
   }
@@ -436,15 +436,13 @@ class ArtworkAnalysisService {
   // Art Search API integration (https://artsearch.io/)
   async searchArtSearch(query: string): Promise<ArtworkAnalysis[]> {
     if (!this.apiKeys.artsearch) {
-      console.warn('Art Search API key not configured')
       return []
     }
 
-    // Attempt direct request, then fall back to CORS proxy if needed
+    // Use proxy during development to avoid CORS
     const endpoints = [
-      // Primary (assumed) endpoint. Replace with exact path if docs specify differently.
-      { url: `https://api.artsearch.io/v1/search?query=${encodeURIComponent(query)}&limit=5`, useProxy: false },
-      { url: `https://api.artsearch.io/search?query=${encodeURIComponent(query)}&limit=5`, useProxy: false },
+      { url: `/proxy/artsearch/v1/search?query=${encodeURIComponent(query)}&limit=5`, useProxy: true },
+      { url: `/proxy/artsearch/search?query=${encodeURIComponent(query)}&limit=5`, useProxy: true },
     ]
 
     // Helper to perform a fetch with both common auth methods
@@ -466,6 +464,7 @@ class ArtworkAnalysisService {
       try {
         const response = await fetchWithAuth(endpoint.url)
         if (!response.ok) {
+          // Treat 4xx as no results to avoid noisy logs
           continue
         }
         const data = await response.json()
@@ -494,7 +493,6 @@ class ArtworkAnalysisService {
       }
     }
 
-    console.warn('Art Search API did not return results for query:', query)
     return []
   }
 
