@@ -129,6 +129,17 @@ export interface WikipediaData {
 }
 
 class ArtworkAnalysisService {
+  private sanitizeQuery(input: string): string {
+    const basic = (input || '')
+      .replace(/\n|\r/g, ' ')
+      .replace(/\([^)]*\)/g, ' ')
+      .replace(/\[[^\]]*\]/g, ' ')
+      .replace(/[^a-zA-Z0-9\s-]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+    const parts = basic.split(' ').filter(Boolean)
+    return parts.slice(0, 4).join(' ') || 'artwork'
+  }
   private apiKeys = {
     googleVision: import.meta.env.VITE_GOOGLE_VISION_API_KEY || '',
     microsoftVision: import.meta.env.VITE_MICROSOFT_VISION_API_KEY || '',
@@ -349,8 +360,9 @@ class ArtworkAnalysisService {
   async searchRijksmuseumArtwork(query: string): Promise<ArtworkAnalysis[]> {
     try {
       // Use the Rijksmuseum data API endpoint
+      const q = this.sanitizeQuery(query)
       const response = await fetch(
-        `/proxy/rijks/search/collection?q=${encodeURIComponent(query)}&ps=5`
+        `/proxy/rijks/search/collection?q=${encodeURIComponent(q)}&ps=5`
       )
 
       if (!response.ok) {
@@ -390,8 +402,42 @@ class ArtworkAnalysisService {
       const artworks = await Promise.all(artworkPromises)
       return artworks.filter(artwork => artwork !== null)
     } catch (error) {
-      // Quietly skip Rijksmuseum failures (often 400 for complex queries)
-      return []
+      // Fallback with simpler query (first token only)
+      try {
+        const simple = this.sanitizeQuery(query).split(' ')[0]
+        if (!simple) return []
+        const response = await fetch(
+          `/proxy/rijks/search/collection?q=${encodeURIComponent(simple)}&ps=5`
+        )
+        if (!response.ok) return []
+        const data = await response.json()
+        if (!data.orderedItems || data.orderedItems.length === 0) return []
+        const artworkPromises = data.orderedItems.slice(0, 3).map(async (item: any) => {
+          try {
+            const artworkResponse = await fetch(item.id)
+            if (artworkResponse.ok) {
+              const artworkData = await artworkResponse.json()
+              return {
+                title: artworkData.title || 'Untitled',
+                artist: artworkData.creator?.[0]?.label || 'Unknown Artist',
+                period: artworkData.created?.timespan?.[0]?.label || '',
+                style: artworkData.technique?.[0]?.label || '',
+                description: artworkData.description?.[0]?.value || '',
+                techniques: artworkData.technique?.map((t: any) => t.label) || [],
+                source: 'Rijksmuseum',
+                confidence: 0.7
+              }
+            }
+            return null
+          } catch {
+            return null
+          }
+        })
+        const artworks = await Promise.all(artworkPromises)
+        return artworks.filter(artwork => artwork !== null)
+      } catch {
+        return []
+      }
     }
   }
 
@@ -440,9 +486,10 @@ class ArtworkAnalysisService {
     }
 
     // Use proxy during development to avoid CORS
+    const q = this.sanitizeQuery(query)
     const endpoints = [
-      { url: `/proxy/artsearch/v1/search?query=${encodeURIComponent(query)}&limit=5`, useProxy: true },
-      { url: `/proxy/artsearch/search?query=${encodeURIComponent(query)}&limit=5`, useProxy: true },
+      { url: `/proxy/artsearch/v1/search?query=${encodeURIComponent(q)}&limit=5`, useProxy: true },
+      { url: `/proxy/artsearch/search?query=${encodeURIComponent(q)}&limit=5`, useProxy: true },
     ]
 
     // Helper to perform a fetch with both common auth methods
@@ -810,9 +857,9 @@ Write with depth and sophistication while maintaining accessibility. Provide sub
       const enrichmentQuery = (() => {
         if (results.length > 0) {
           const r = results[0]
-          return r.title || r.artist || r.style || r.techniques?.[0] || 'artwork'
+          return this.sanitizeQuery(r.title || r.artist || r.style || r.techniques?.[0] || 'artwork')
         }
-        return imageFile.name.split('.')[0] || 'artwork'
+        return this.sanitizeQuery(imageFile.name.split('.')[0] || 'artwork')
       })()
 
       try {
