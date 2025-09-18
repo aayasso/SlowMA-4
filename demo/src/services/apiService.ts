@@ -146,10 +146,12 @@ class ArtworkAnalysisService {
     microsoftEndpoint: import.meta.env.VITE_MICROSOFT_VISION_ENDPOINT || '',
     artInstitute: import.meta.env.VITE_ART_INSTITUTE_API_KEY || '',
     openai: import.meta.env.VITE_OPENAI_API_KEY || '',
-    rijksmuseum: import.meta.env.VITE_RIJKSMUSEUM_API_KEY || '',
+    // Rijksmuseum removed
     harvard: import.meta.env.VITE_HARVARD_ART_MUSEUMS_API_KEY || '',
     wikipedia: '', // Wikipedia API is free, no key needed
-    artsearch: import.meta.env.VITE_ARTSEARCH_API_KEY || ''
+    artsearch: import.meta.env.VITE_ARTSEARCH_API_KEY || '',
+    clarifai: import.meta.env.VITE_CLARIFAI_API_KEY || '',
+    clarifaiModelId: import.meta.env.VITE_CLARIFAI_MODEL_ID || 'general-image-recognition'
   }
 
   // Google Vision API integration
@@ -235,10 +237,12 @@ class ArtworkAnalysisService {
     }
 
     try {
-      // Ensure we have a valid base64 string
+      // Ensure we have a valid base64 string and convert to JPEG bytes (Azure v3.2 may reject WEBP)
       const base64Content = imageBase64.includes(',') 
         ? imageBase64.split(',')[1] 
         : imageBase64
+
+      const jpegBytes = await this.convertBase64ToJpegBytes(imageBase64)
 
       const response = await fetch(
         `${this.apiKeys.microsoftEndpoint}vision/v3.2/analyze?visualFeatures=Categories,Description,Objects,Color,Adult,Tags`,
@@ -248,12 +252,13 @@ class ArtworkAnalysisService {
             'Ocp-Apim-Subscription-Key': this.apiKeys.microsoftVision,
             'Content-Type': 'application/octet-stream',
           },
-          body: new Uint8Array(Array.from(atob(base64Content), c => c.charCodeAt(0)))
+          body: jpegBytes
         }
       )
 
       if (!response.ok) {
-        throw new Error(`Microsoft Vision API error: ${response.status}`)
+        const errorText = await response.text().catch(() => '')
+        throw new Error(`Microsoft Vision API error: ${response.status}${errorText ? ' - ' + errorText : ''}`)
       }
 
       const data = await response.json()
@@ -273,14 +278,86 @@ class ArtworkAnalysisService {
     }
   }
 
+  // Clarifai API integration
+  async analyzeWithClarifai(imageBase64: string): Promise<ImageAnalysisResult> {
+    if (!this.apiKeys.clarifai) {
+      throw new Error('Clarifai API key not configured')
+    }
+
+    try {
+      const base64Content = imageBase64.includes(',') 
+        ? imageBase64.split(',')[1] 
+        : imageBase64
+
+      // Choose model id, and prepare fallbacks if 404 occurs
+      const primaryModelId = this.apiKeys.clarifaiModelId || 'general-image-recognition'
+      const candidateModelIds = [primaryModelId, 'general-image-recognition@001', 'general-image-recognition']
+
+      const attemptRequest = async (modelId: string) => fetch(`/proxy/clarifai/v2/models/${modelId}/outputs`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Key ${this.apiKeys.clarifai}`
+        },
+        body: JSON.stringify({
+          inputs: [
+            {
+              data: {
+                image: { base64: base64Content }
+              }
+            }
+          ]
+        })
+      })
+
+      let data: any = null
+      let lastErrorText = ''
+      for (const modelId of candidateModelIds) {
+        const response = await attemptRequest(modelId)
+        if (response.ok) {
+          data = await response.json()
+          break
+        }
+        const errorText = await response.text()
+        lastErrorText = errorText
+        if (!(response.status === 404 && /Model .* does not exist/i.test(errorText))) {
+          throw new Error(`Clarifai API error: ${response.status} - ${errorText}`)
+        }
+        // else continue to next candidate
+      }
+      if (!data) {
+        throw new Error(
+          `Clarifai API error: 404 - Model not found for tried models ${candidateModelIds.join(', ')}. ` +
+          `Set VITE_CLARIFAI_MODEL_ID in demo/.env to a valid model. Raw: ${lastErrorText}`
+        )
+      }
+      const concepts = data.outputs?.[0]?.data?.concepts || []
+
+      const labels = concepts
+        .filter((c: any) => typeof c.name === 'string')
+        .slice(0, 20)
+        .map((c: any) => c.name)
+
+      return {
+        labels,
+        objects: labels.slice(0, 10),
+        text: [],
+        colors: [],
+        faces: 0,
+        adultContent: false,
+        violence: false
+      }
+    } catch (error) {
+      console.error('Clarifai API error:', error)
+      throw error
+    }
+  }
+
   // Metropolitan Museum of Art API integration (no API key required)
   async searchMetMuseumArtwork(query: string): Promise<MetMuseumArtwork[]> {
     try {
-      // Use vite proxy to avoid CORS during development
-      const proxyUrl = '/proxy/allorigins/raw?url='
-      const targetUrl = `https://collectionapi.metmuseum.org/public/collection/v1/search?q=${encodeURIComponent(query)}&hasImages=true&isOnView=true`
-      
-      const response = await fetch(proxyUrl + encodeURIComponent(targetUrl))
+      // Use dedicated Met proxy to avoid CORS and reduce rate-limit errors
+      const response = await fetch(`/proxy/met/public/collection/v1/search?q=${encodeURIComponent(query)}&hasImages=true&isOnView=true`)
 
       if (!response.ok) {
         console.log('Met Museum API failed, trying alternative approach')
@@ -308,11 +385,9 @@ class ArtworkAnalysisService {
   }
 
   private async fetchMetMuseumDetails(objectIDs: number[]): Promise<MetMuseumArtwork[]> {
-    const proxyUrl = '/proxy/allorigins/raw?url='
     const artworkPromises = objectIDs.map(async (objectID: number) => {
       try {
-        const artworkUrl = `https://collectionapi.metmuseum.org/public/collection/v1/objects/${objectID}`
-        const response = await fetch(proxyUrl + encodeURIComponent(artworkUrl))
+        const response = await fetch(`/proxy/met/public/collection/v1/objects/${objectID}`)
         
         if (response.ok) {
           return await response.json()
@@ -356,90 +431,7 @@ class ArtworkAnalysisService {
     }
   }
 
-  // Rijksmuseum API integration (free, no API key required)
-  async searchRijksmuseumArtwork(query: string): Promise<ArtworkAnalysis[]> {
-    try {
-      // Use the Rijksmuseum data API endpoint
-      const q = this.sanitizeQuery(query)
-      const response = await fetch(
-        `/proxy/rijks/search/collection?q=${encodeURIComponent(q)}&ps=5`
-      )
-
-      if (!response.ok) {
-        throw new Error(`Rijksmuseum API error: ${response.status}`)
-      }
-
-      const data = await response.json()
-      
-      // The Rijksmuseum data API returns a different format
-      if (!data.orderedItems || data.orderedItems.length === 0) {
-        return []
-      }
-
-      // Get detailed information for the first few artworks
-      const artworkPromises = data.orderedItems.slice(0, 5).map(async (item: any) => {
-        try {
-          const artworkResponse = await fetch(item.id)
-          if (artworkResponse.ok) {
-            const artworkData = await artworkResponse.json()
-            return {
-              title: artworkData.title || 'Untitled',
-              artist: artworkData.creator?.[0]?.label || 'Unknown Artist',
-              period: artworkData.created?.timespan?.[0]?.label || '',
-              style: artworkData.technique?.[0]?.label || '',
-              description: artworkData.description?.[0]?.value || '',
-              techniques: artworkData.technique?.map((t: any) => t.label) || [],
-              source: 'Rijksmuseum',
-              confidence: 0.8
-            }
-          }
-          return null
-        } catch (error) {
-          return null
-        }
-      })
-
-      const artworks = await Promise.all(artworkPromises)
-      return artworks.filter(artwork => artwork !== null)
-    } catch (error) {
-      // Fallback with simpler query (first token only)
-      try {
-        const simple = this.sanitizeQuery(query).split(' ')[0]
-        if (!simple) return []
-        const response = await fetch(
-          `/proxy/rijks/search/collection?q=${encodeURIComponent(simple)}&ps=5`
-        )
-        if (!response.ok) return []
-        const data = await response.json()
-        if (!data.orderedItems || data.orderedItems.length === 0) return []
-        const artworkPromises = data.orderedItems.slice(0, 3).map(async (item: any) => {
-          try {
-            const artworkResponse = await fetch(item.id)
-            if (artworkResponse.ok) {
-              const artworkData = await artworkResponse.json()
-              return {
-                title: artworkData.title || 'Untitled',
-                artist: artworkData.creator?.[0]?.label || 'Unknown Artist',
-                period: artworkData.created?.timespan?.[0]?.label || '',
-                style: artworkData.technique?.[0]?.label || '',
-                description: artworkData.description?.[0]?.value || '',
-                techniques: artworkData.technique?.map((t: any) => t.label) || [],
-                source: 'Rijksmuseum',
-                confidence: 0.7
-              }
-            }
-            return null
-          } catch {
-            return null
-          }
-        })
-        const artworks = await Promise.all(artworkPromises)
-        return artworks.filter(artwork => artwork !== null)
-      } catch {
-        return []
-      }
-    }
-  }
+  // Rijksmuseum integration removed
 
   // Harvard Art Museums API integration (free with API key)
   async searchHarvardArtwork(query: string): Promise<ArtworkAnalysis[]> {
@@ -487,9 +479,12 @@ class ArtworkAnalysisService {
 
     // Use proxy during development to avoid CORS
     const q = this.sanitizeQuery(query)
+    // Match vite proxy that rewrites `/proxy/artsearch/*` directly to `https://api.artsearch.io/*`
+    // Prefer the documented v1 path; fallback to root if needed
     const endpoints = [
-      { url: `/proxy/artsearch/v1/search?query=${encodeURIComponent(q)}&limit=5`, useProxy: true },
-      { url: `/proxy/artsearch/search?query=${encodeURIComponent(q)}&limit=5`, useProxy: true },
+      { url: `/proxy/artsearch/v1/search?query=${encodeURIComponent(q)}&limit=5` },
+      { url: `/proxy/artsearch/api/v1/search?query=${encodeURIComponent(q)}&limit=5` },
+      { url: `/proxy/artsearch/search?query=${encodeURIComponent(q)}&limit=5` },
     ]
 
     // Helper to perform a fetch with both common auth methods
@@ -579,9 +574,7 @@ class ArtworkAnalysisService {
           }))
           similarArtworks.push(...metMuseumAnalyses.slice(0, 2))
 
-          // Search Rijksmuseum
-          const rijksmuseumResults = await this.searchRijksmuseumArtwork(term)
-          similarArtworks.push(...rijksmuseumResults.slice(0, 2))
+          // Rijksmuseum disabled
 
           // Search Harvard Art Museums
           const harvardResults = await this.searchHarvardArtwork(term)
@@ -611,7 +604,11 @@ class ArtworkAnalysisService {
   async searchWikipedia(query: string): Promise<WikipediaData | null> {
     try {
       // Clean up the query to be more Wikipedia-friendly
-      const cleanQuery = query.replace(/[^a-zA-Z0-9\s]/g, '').trim()
+      const cleanQuery = query
+        .replace(/[\n\r]+/g, ' ')       // remove newlines
+        .replace(/[^a-zA-Z0-9\s-]/g, ' ') // drop punctuation except spaces and hyphens
+        .replace(/\s+/g, ' ')            // collapse whitespace
+        .trim()
       
       // Skip generic terms that are likely to cause 404 errors
       const skipTerms = ['Image Analysis', 'Visual Artist', 'Unknown Artist', 'Artwork Analysis', 'Mixed Style']
@@ -619,17 +616,17 @@ class ArtworkAnalysisService {
         return null
       }
 
-      // Try the original query first
-      let response = await fetch(
-        `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(cleanQuery)}`
-      )
+      // Build target URL and route via AllOrigins proxy to avoid CORS/403 in browsers
+      const targetUrl = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(cleanQuery)}`
+      const proxyUrl = `/proxy/allorigins/raw?url=${encodeURIComponent(targetUrl)}`
+      // Try the original query first via proxy
+      let response = await fetch(proxyUrl)
 
       if (!response.ok) {
         // Only try "Art" as fallback if the original query was reasonable
         if (response.status === 404 && cleanQuery.length > 3) {
-          response = await fetch(
-            `https://en.wikipedia.org/api/rest_v1/page/summary/Art`
-          )
+          const fallbackTarget = `https://en.wikipedia.org/api/rest_v1/page/summary/Art`
+          response = await fetch(`/proxy/allorigins/raw?url=${encodeURIComponent(fallbackTarget)}`)
           if (!response.ok) {
             return null
           }
@@ -788,11 +785,11 @@ Write with depth and sophistication while maintaining accessibility. Provide sub
                           this.apiKeys.microsoftEndpoint !== 'your_microsoft_vision_endpoint_here'),
       artInstitute: true, // Always available
       openai: !!this.apiKeys.openai && this.apiKeys.openai !== 'your_openai_api_key_here',
-      rijksmuseum: true, // Always available (no key required)
       harvard: !!this.apiKeys.harvard && this.apiKeys.harvard !== 'your_harvard_art_museums_api_key_here',
       metMuseum: true, // Always available
       wikipedia: true, // Always available
-      artSearch: !!this.apiKeys.artsearch
+      artSearch: !!this.apiKeys.artsearch,
+      clarifai: !!this.apiKeys.clarifai
     }
 
     console.log('🔍 API Status:', status)
@@ -814,6 +811,7 @@ Write with depth and sophistication while maintaining accessibility. Provide sub
     const hasWikipedia = apiStatus.wikipedia
     const hasRijksmuseum = apiStatus.rijksmuseum
     const hasHarvard = apiStatus.harvard
+    const hasClarifai = (apiStatus as any).clarifai
     
     // Always allow analysis with free APIs
     if (!hasArtInstitute && !hasMetMuseum && !hasWikipedia && !hasRijksmuseum && !hasHarvard) {
@@ -852,6 +850,17 @@ Write with depth and sophistication while maintaining accessibility. Provide sub
         }
       }
 
+      // Try Clarifai
+      if (this.apiKeys.clarifai) {
+        try {
+          const clarifaiResult = await this.analyzeWithClarifai(imageBase64)
+          visionResults.push(clarifaiResult)
+          results.push(this.processVisionResults(clarifaiResult, 'Clarifai'))
+        } catch (error) {
+          console.warn('Clarifai API failed:', error)
+        }
+      }
+
       
       // Enrich with public art collection searches using detected context
       const enrichmentQuery = (() => {
@@ -863,16 +872,14 @@ Write with depth and sophistication while maintaining accessibility. Provide sub
       })()
 
       try {
-        const [artInstituteResults, rijksResults, harvardResults, artSearchResults] = await Promise.all([
+        const [artInstituteResults, harvardResults, artSearchResults] = await Promise.all([
           this.searchArtwork(enrichmentQuery).catch(() => []),
-          this.searchRijksmuseumArtwork(enrichmentQuery).catch(() => []),
           this.searchHarvardArtwork(enrichmentQuery).catch(() => []),
           this.searchArtSearch(enrichmentQuery).catch(() => [])
         ])
 
         // Add top items from each source to results for summary combination
         if (artInstituteResults.length > 0) results.push(artInstituteResults[0])
-        if (rijksResults.length > 0) results.push(rijksResults[0])
         if (harvardResults.length > 0) results.push(harvardResults[0])
         if (artSearchResults.length > 0) results.push(artSearchResults[0])
       } catch (error) {
@@ -1122,6 +1129,37 @@ Write with depth and sophistication while maintaining accessibility. Provide sub
       }
       
       img.src = imageBase64
+    })
+  }
+
+  // Convert any base64 image (PNG/WEBP/JPEG/DataURL) to JPEG bytes for reliable Azure ingestion
+  private async convertBase64ToJpegBytes(dataUrlOrBase64: string): Promise<Uint8Array> {
+    return new Promise((resolve) => {
+      try {
+        const img = new Image()
+        img.crossOrigin = 'anonymous'
+        img.onload = () => {
+          const canvas = document.createElement('canvas')
+          const ctx = canvas.getContext('2d')
+          if (!ctx) {
+            resolve(new Uint8Array())
+            return
+          }
+          canvas.width = img.width
+          canvas.height = img.height
+          ctx.drawImage(img, 0, 0)
+          const jpegDataUrl = canvas.toDataURL('image/jpeg', 0.92)
+          const base64 = jpegDataUrl.split(',')[1]
+          const binary = atob(base64)
+          const bytes = new Uint8Array(binary.length)
+          for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+          resolve(bytes)
+        }
+        img.onerror = () => resolve(new Uint8Array())
+        img.src = dataUrlOrBase64.includes(',') ? dataUrlOrBase64 : `data:image/*;base64,${dataUrlOrBase64}`
+      } catch {
+        resolve(new Uint8Array())
+      }
     })
   }
   

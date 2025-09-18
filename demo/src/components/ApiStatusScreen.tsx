@@ -43,6 +43,12 @@ const ApiStatusScreen: React.FC = () => {
         required: true,
         cost: 'Pay per request'
       },
+      clarifai: {
+        name: 'Clarifai',
+        description: 'General image recognition and concepts detection',
+        required: false,
+        cost: 'Depends on plan'
+      },
       artInstitute: {
         name: 'Art Institute of Chicago',
         description: 'Free access to art collection data',
@@ -55,12 +61,6 @@ const ApiStatusScreen: React.FC = () => {
         required: false,
         cost: 'Pay per token'
       },
-      rijksmuseum: {
-        name: 'Rijksmuseum API',
-        description: 'Dutch art collection and metadata',
-        required: false,
-        cost: 'Free'
-      },
       metMuseum: {
         name: 'Metropolitan Museum of Art',
         description: 'Extensive art collection database',
@@ -72,10 +72,22 @@ const ApiStatusScreen: React.FC = () => {
         description: 'Educational content and context',
         required: false,
         cost: 'Free'
+      },
+      harvard: {
+        name: 'Harvard Art Museums',
+        description: 'Harvard collection data (API key required)',
+        required: false,
+        cost: 'Free with key'
+      },
+      artSearch: {
+        name: 'Art Search API',
+        description: 'Unified art search across collections',
+        required: false,
+        cost: 'Depends on plan'
       }
     }
 
-    return apiInfo[apiName as keyof typeof apiInfo] || {
+    return (apiInfo as any)[apiName] || {
       name: apiName,
       description: 'Unknown API',
       required: false,
@@ -205,9 +217,9 @@ const ApiStatusScreen: React.FC = () => {
           <h4>Optional APIs (enhance analysis):</h4>
           <ul>
             <li>OpenAI GPT-4 - AI-powered artistic insights</li>
-            <li>Rijksmuseum API - Dutch art collection (FREE)</li>
             <li>Metropolitan Museum of Art - Extensive art database (FREE)</li>
             <li>Wikipedia API - Educational content (FREE)</li>
+            <li>Harvard Art Museums - Collection data (FREE with key)</li>
             <li>Art Search API - Unified art search across collections</li>
           </ul>
         </div>
