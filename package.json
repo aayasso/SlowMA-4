@@ -2,25 +2,31 @@
   "name": "slowlook",
   "version": "1.0.0",
   "description": "A mobile app that teaches users how to look at artworks",
+  "type": "module",
   "main": "index.js",
   "scripts": {
     "android": "react-native run-android",
     "ios": "react-native run-ios",
     "start": "react-native start",
+    "start:proxy": "node server.js",
     "test": "jest",
     "lint": "eslint ."
   },
   "dependencies": {
-    "react": "18.2.0",
-    "react-native": "0.72.6",
     "@react-navigation/native": "^6.1.9",
     "@react-navigation/stack": "^6.3.20",
-    "react-native-screens": "^3.25.0",
-    "react-native-safe-area-context": "^4.7.4",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.2",
+    "express": "^5.1.0",
+    "node-fetch": "^3.3.2",
+    "react": "18.2.0",
+    "react-native": "0.72.6",
     "react-native-gesture-handler": "^2.13.4",
     "react-native-image-picker": "^7.0.3",
-    "react-native-vector-icons": "^10.0.2",
-    "react-native-linear-gradient": "^2.8.3"
+    "react-native-linear-gradient": "^2.8.3",
+    "react-native-safe-area-context": "^4.7.4",
+    "react-native-screens": "^3.25.0",
+    "react-native-vector-icons": "^10.0.2"
   },
   "devDependencies": {
     "@babel/core": "^7.20.0",
