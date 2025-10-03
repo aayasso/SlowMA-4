@@ -138,7 +138,7 @@ interface EducationalAnalysis {
   }>;
 }
 
-const ArtworkAnalysisScreen: React.FC<ArtworkAnalysisScreenProps> = ({ navigation, route }) => {
+const ArtworkAnalysisScreen: React.FC<any> = ({ navigation, route }) => {
   const { imageUri } = route.params;
   const [loading, setLoading] = useState(true);
   const [educationalAnalysis, setEducationalAnalysis] = useState<EducationalAnalysis | null>(null);
@@ -230,7 +230,7 @@ const ArtworkAnalysisScreen: React.FC<ArtworkAnalysisScreenProps> = ({ navigatio
             visualFlow: "Eye moves from foreground to background",
             focalPoints: ["Central figure", "Light source"],
             spatialRelationships: ["Foreground, middle ground, background"],
-            balanceAndRhythm: "Asymmetrical balance with rhythmic brushstrokes",
+                balanceAndRhythm: ["Asymmetrical balance with rhythmic brushstrokes"],
             educationalApplications: ["Teaches perspective", "Shows composition techniques"]
           },
           reflectionQuestions: [

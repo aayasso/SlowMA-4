@@ -5,7 +5,7 @@ import { StatusBar } from 'react-native';
 import HomeScreen from './src/screens/HomeScreen';
 import ArtworkAnalysisScreen from './src/screens/ArtworkAnalysisScreen';
 
-const Stack = createStackNavigator();
+const Stack = createStackNavigator<any>();
 
 const App = () => {
   return (

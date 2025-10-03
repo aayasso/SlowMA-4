@@ -9,6 +9,7 @@
     "ios": "react-native run-ios",
     "start": "react-native start",
     "start:proxy": "node server.js",
+    "type-check": "tsc --noEmit",
     "test": "jest",
     "lint": "eslint ."
   },
@@ -21,6 +22,7 @@
     "node-fetch": "^3.3.2",
     "react": "18.2.0",
     "react-native": "0.72.6",
+    "react-native-config": "^1.5.9",
     "react-native-gesture-handler": "^2.13.4",
     "react-native-image-picker": "^7.0.3",
     "react-native-linear-gradient": "^2.8.3",
