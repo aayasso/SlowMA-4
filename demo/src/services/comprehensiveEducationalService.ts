@@ -230,15 +230,36 @@ class ComprehensiveEducationalService {
 
   // Stage 1: Vision Analysis
   private async performVisionAnalysis(imageBase64: string) {
-    const visionResults = await Promise.allSettled([
-      this.analyzeWithClarifai(imageBase64),
-      this.analyzeWithGoogleVision(imageBase64),
-      this.analyzeWithMicrosoftVision(imageBase64)
-    ]);
+    // Only call APIs that have valid keys configured
+    const visionPromises = []
+    
+    if (this.apiKeys.clarifai) {
+      visionPromises.push(this.analyzeWithClarifai(imageBase64))
+    }
+    if (this.apiKeys.googleVision) {
+      visionPromises.push(this.analyzeWithGoogleVision(imageBase64))
+    }
+    if (this.apiKeys.microsoftVision) {
+      visionPromises.push(this.analyzeWithMicrosoftVision(imageBase64))
+    }
+    
+    const visionResults = await Promise.allSettled(visionPromises);
 
-    const clarifai = visionResults[0].status === 'fulfilled' ? visionResults[0].value : null;
-    const google = visionResults[1].status === 'fulfilled' ? visionResults[1].value : null;
-    const microsoft = visionResults[2].status === 'fulfilled' ? visionResults[2].value : null;
+    // Handle results based on which APIs were actually called
+    let clarifai = null, google = null, microsoft = null;
+    let resultIndex = 0;
+    
+    if (this.apiKeys.clarifai) {
+      clarifai = visionResults[resultIndex].status === 'fulfilled' ? visionResults[resultIndex].value : null;
+      resultIndex++;
+    }
+    if (this.apiKeys.googleVision) {
+      google = visionResults[resultIndex].status === 'fulfilled' ? visionResults[resultIndex].value : null;
+      resultIndex++;
+    }
+    if (this.apiKeys.microsoftVision) {
+      microsoft = visionResults[resultIndex].status === 'fulfilled' ? visionResults[resultIndex].value : null;
+    }
 
     // Require at least one vision API to succeed
     if (!clarifai && !google && !microsoft) {
@@ -277,7 +298,7 @@ class ComprehensiveEducationalService {
   // Stage 2: Initial AI Interpretation
   private async generateInitialInterpretation(visionData: any) {
     if (!this.apiKeys.openai) {
-      throw new Error('OpenAI API key not configured - Real API mode requires all keys');
+      throw new Error('OpenAI API key not configured');
     }
 
     const prompt = `Analyze this artwork for educational purposes and produce approachable guidance suitable for a broad audience. Use clear, encouraging language and focus on a guided walkthrough (Observe → Analyze → Interpret → Connect). Prioritize accurate, student-friendly insights.
@@ -435,7 +456,7 @@ Provide educational insights in this JSON format (valid JSON only):
       );
     }
 
-    // 6. Art Search API
+    // 6. Art Search API (skip if no key configured)
     if (this.apiKeys.artsearch && searchTerms.length > 0) {
       const term = searchTerms[0]
       const cacheKey = `artsearch:${term}`
@@ -445,6 +466,8 @@ Provide educational insights in this JSON format (valid JSON only):
           if (result && result.length > 0) console.log('✅ Art Search data found:', result.length, 'artworks');
         }).catch(err => console.warn('Art Search failed:', err))
       );
+    } else if (!this.apiKeys.artsearch) {
+      console.log('⚠️ Art Search API key not configured, skipping Art Search queries');
     }
 
     // 7. Enhanced texture analysis if brushwork/technique mentioned
@@ -502,7 +525,7 @@ Provide educational insights in this JSON format (valid JSON only):
   // Stage 4: Final Synthesis
   private async generateFinalSynthesis(visionData: any, initialInsights: any, recallData: any): Promise<ComprehensiveEducationalAnalysis> {
     if (!this.apiKeys.openai) {
-      throw new Error('OpenAI API key not configured - Real API mode requires all keys');
+      throw new Error('OpenAI API key not configured');
     }
 
     const synthesisPrompt = `Create a comprehensive, approachable educational walkthrough that teaches students how to look at and understand this artwork. Use a calm, encouraging tone and organize content so it can be presented step-by-step.
@@ -637,7 +660,7 @@ Generate a complete educational analysis in this JSON format:
   // Helper methods for API calls
   private async analyzeWithClarifai(imageBase64: string) {
     if (!this.apiKeys.clarifai) {
-      throw new Error('Clarifai API key not configured - Real API mode requires all keys');
+      throw new Error('Clarifai API key not configured');
     }
 
     const base64Content = imageBase64.includes(',') 
@@ -684,7 +707,7 @@ Generate a complete educational analysis in this JSON format:
 
   private async analyzeWithGoogleVision(imageBase64: string) {
     if (!this.apiKeys.googleVision) {
-      throw new Error('Google Vision API key not configured - Real API mode requires all keys');
+      throw new Error('Google Vision API key not configured');
     }
 
     const base64Content = imageBase64.includes(',') 
@@ -731,7 +754,7 @@ Generate a complete educational analysis in this JSON format:
 
   private async analyzeWithMicrosoftVision(imageBase64: string) {
     if (!this.apiKeys.microsoftVision || !this.apiKeys.microsoftEndpoint) {
-      throw new Error('Microsoft Vision API not configured - Real API mode requires all keys');
+      throw new Error('Microsoft Vision API not configured');
     }
 
     const base64Content = imageBase64.includes(',') 
@@ -867,7 +890,7 @@ Generate a complete educational analysis in this JSON format:
 
   private async searchArtSearch(query: string) {
     if (!this.apiKeys.artsearch) {
-      throw new Error('Art Search API key not configured - Real API mode requires all keys');
+      throw new Error('Art Search API key not configured');
     }
     
     const endpoints = [

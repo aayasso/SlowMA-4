@@ -554,6 +554,34 @@
   font-weight: 600;
 }
 
+/* Learning Points Styling */
+.learning-points {
+  background-color: #F8F9FA;
+  border-left: 4px solid #2196F3;
+  padding: 16px;
+  margin: 12px 0;
+  border-radius: 4px;
+}
+
+.learning-points h5 {
+  margin: 0 0 8px 0;
+  color: #1976D2;
+  font-size: 14px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.learning-points .bullet-list li {
+  color: #424242;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.learning-points .bullet-list li:before {
+  color: #1976D2;
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
   .color-palette {

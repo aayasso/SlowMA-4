@@ -221,18 +221,9 @@ Generate comprehensive educational insights in this JSON format:
 
   // Generate adaptive initial insights
   private async generateAdaptiveInitialInsights(visionData: any, artworkType: ArtworkType): Promise<any> {
-    // Fallback when OpenAI is not available
+    // Require OpenAI API key - no fallback data
     if (!this.apiKeys.openai) {
-      return {
-        styleInsights: ['This artwork demonstrates thoughtful composition and visual balance', 'The artist shows careful consideration of color relationships and spatial arrangement'],
-        techniqueInsights: ['The work exhibits skilled use of visual elements', 'Compositional techniques create visual interest and guide the viewer\'s eye'],
-        themeInsights: ['The artwork explores themes of visual expression and artistic communication', 'Emotional tone is conveyed through color choices and compositional decisions'],
-        mediumInsights: ['The medium choice supports the artistic vision', 'Material properties contribute to the overall aesthetic impact'],
-        historicalContext: 'This artwork represents contemporary approaches to visual expression and artistic education',
-        culturalSignificance: 'The work demonstrates universal principles of visual literacy and artistic appreciation',
-        artisticInnovations: ['Focus on fundamental visual elements', 'Educational approach to art appreciation'],
-        criticalReception: 'Valued for its educational potential in developing visual literacy skills'
-      }
+      throw new Error('OpenAI API key required for initial insights - no mock data will be used')
     }
 
     const adaptivePrompt = this.generateAdaptivePrompt(visionData, artworkType)
@@ -260,32 +251,17 @@ Generate comprehensive educational insights in this JSON format:
       })
     })
     if (!response.ok) {
-      return {
-        styleInsights: ['This artwork demonstrates thoughtful composition and visual balance'],
-        techniqueInsights: ['The work exhibits skilled use of visual elements'],
-        themeInsights: ['The artwork explores themes of visual expression'],
-        mediumInsights: ['The medium choice supports the artistic vision']
-      }
+      throw new Error(`OpenAI API failed with status ${response.status}: ${response.statusText}`)
     }
     const data = await response.json()
     const content = data?.choices?.[0]?.message?.content
     if (!content || typeof content !== 'string') {
-      return {
-        styleInsights: ['This artwork demonstrates thoughtful composition and visual balance'],
-        techniqueInsights: ['The work exhibits skilled use of visual elements'],
-        themeInsights: ['The artwork explores themes of visual expression'],
-        mediumInsights: ['The medium choice supports the artistic vision']
-      }
+      throw new Error('OpenAI API returned invalid content - no mock data will be used')
     }
     try {
       return JSON.parse(content)
-    } catch {
-      return {
-        styleInsights: [content.substring(0, 200)],
-        techniqueInsights: [],
-        themeInsights: [],
-        mediumInsights: []
-      }
+    } catch (error) {
+      throw new Error(`OpenAI API returned invalid JSON: ${error instanceof Error ? error.message : 'Parse error'} - no mock data will be used`)
     }
   }
 
@@ -349,123 +325,9 @@ Generate comprehensive educational insights in this JSON format:
     recallData: any,
     artworkType: ArtworkType
   ): Promise<SimplifiedEducationalAnalysis> {
-    // Fallback when OpenAI is not available
+    // Require OpenAI API key - no fallback data
     if (!this.apiKeys.openai) {
-      const colors = visionData.combined?.colors || ['#FF6B6B', '#4ECDC4', '#45B7D1']
-      const labels = visionData.combined?.labels || ['artwork']
-      const isWarm = labels.some(l => l.includes('warm'))
-      const isCool = labels.some(l => l.includes('cool'))
-      const isBright = labels.some(l => l.includes('bright'))
-      const isDark = labels.some(l => l.includes('dark'))
-      const isVibrant = labels.some(l => l.includes('vibrant'))
-      const isMuted = labels.some(l => l.includes('muted'))
-      
-      return {
-        styleAnalysis: {
-          primaryStyle: this.determineStyleFromLabels(labels),
-          styleCharacteristics: this.generateStyleCharacteristics(labels, colors),
-          movementContext: this.generateMovementContext(labels),
-          stylisticInfluences: this.generateStylisticInfluences(labels),
-          visualLanguage: this.generateVisualLanguage(labels, colors),
-          educationalInsights: this.generateEducationalInsights(labels, colors),
-          historicalSignificance: 'This artwork demonstrates fundamental principles of visual communication and artistic expression',
-          culturalContext: 'Visual elements that speak across cultures and time periods'
-        },
-        techniqueAnalysis: {
-          primaryTechniques: ['Compositional planning', 'Color orchestration', 'Visual balance'],
-          materialProperties: ['Image-based analysis'],
-          applicationMethods: ['Layering', 'Contrast management', 'Focal point creation'],
-          technicalInnovations: ['Educational focus on observation skills'],
-          skillLevel: 'Educational',
-          educationalValue: ['Develops visual literacy', 'Encourages careful observation', 'Builds analytical thinking']
-        },
-        themeAnalysis: {
-          primaryThemes: ['Visual expression', 'Artistic communication', 'Aesthetic appreciation'],
-          symbolicElements: ['Color symbolism', 'Compositional meaning'],
-          emotionalTone: 'Engaging and thought-provoking',
-          culturalContext: 'Universal visual language',
-          narrativeElements: ['Visual storytelling through composition'],
-          interpretiveApproaches: ['Formal analysis', 'Personal response', 'Educational inquiry']
-        },
-        mediumAnalysis: {
-          primaryMedium: 'Digital image analysis',
-          materialCharacteristics: ['High resolution', 'Color accuracy'],
-          historicalUsage: 'Contemporary educational technology',
-          technicalAdvantages: ['Accessibility', 'Scalability', 'Interactivity'],
-          conservationNotes: ['Digital preservation standards'],
-          educationalSignificance: ['Enables widespread access to art education']
-        },
-        colorAnalysis: {
-          colorPalette: this.generateColorPalette(colors),
-          colorHarmony: this.generateColorHarmony(labels, colors),
-          emotionalImpact: this.generateEmotionalImpact(labels, colors),
-          symbolicMeaning: this.generateSymbolicMeaning(labels),
-          colorTheory: this.generateColorTheory(labels, colors),
-          educationalInsights: this.generateColorEducationalInsights(labels, colors)
-        },
-        compositionAnalysis: {
-          compositionalPrinciples: ['Balance', 'Emphasis', 'Movement', 'Unity'],
-          visualFlow: 'Eye follows natural reading patterns and visual hierarchy',
-          focalPoints: ['Areas of high contrast', 'Color accents'],
-          spatialRelationships: ['Foreground and background elements', 'Scale relationships'],
-          balanceAndRhythm: ['Symmetrical or asymmetrical balance', 'Repetitive visual elements'],
-          educationalApplications: ['Practice identifying compositional elements', 'Create your own compositions using similar principles']
-        },
-        artisticMovements: [
-          {
-            name: 'Visual Literacy Movement',
-            timePeriod: '20th-21st century',
-            characteristics: ['Focus on visual communication', 'Educational approach to art'],
-            keyArtists: ['Art educators and visual literacy advocates'],
-            culturalContext: 'Digital age visual communication',
-            educationalRelevance: 'Essential for navigating modern visual culture'
-          }
-        ],
-        visualElements: [
-          {
-            element: 'Color',
-            description: 'Dominant hues that organize the composition and create mood',
-            educationalValue: 'Learn to identify color relationships and their effects',
-            observationTips: ['Squint to see value patterns', 'Identify warm vs cool areas'],
-            relatedConcepts: ['Color theory', 'Emotional response', 'Visual hierarchy']
-          },
-          {
-            element: 'Shape',
-            description: 'Geometric and organic forms that create structure',
-            educationalValue: 'Understand how shapes guide the eye and create meaning',
-            observationTips: ['Trace major shapes with your finger', 'Notice positive and negative space'],
-            relatedConcepts: ['Balance', 'Proportion', 'Visual weight']
-          },
-          {
-            element: 'Line',
-            description: 'Implied and actual lines that create movement and direction',
-            educationalValue: 'Recognize how lines guide attention and create rhythm',
-            observationTips: ['Follow the lines with your eye', 'Notice thick vs thin lines'],
-            relatedConcepts: ['Movement', 'Direction', 'Energy']
-          }
-        ],
-        historicalContext: {
-          timePeriod: 'Contemporary',
-          culturalBackground: 'Global digital culture',
-          artisticClimate: 'Emphasis on visual literacy and education',
-          socialInfluences: ['Digital technology', 'Educational reform', 'Visual communication'],
-          educationalSignificance: 'Prepares students for visual communication in the digital age'
-        },
-        learningResources: {
-          keyConcepts: ['Visual literacy', 'Composition', 'Color theory', 'Artistic analysis'],
-          vocabulary: ['Composition', 'Balance', 'Contrast', 'Harmony', 'Focal point', 'Visual hierarchy'],
-          relatedArtworks: ['Study other artworks with similar compositional principles'],
-          furtherReading: ['Visual literacy resources', 'Art education materials', 'Composition guides']
-        },
-        confidence: 0.8,
-        sources: ['Simplified Educational Analysis'],
-        artworkType,
-        qualityMetrics: {
-          depthScore: 0.8,
-          pedagogicalAlignment: 0.9,
-          educationalValue: 0.85
-        }
-      }
+      throw new Error('OpenAI API key required for rich educational content - no mock data will be used')
     }
 
     const synthesisPrompt = this.generateRichSynthesisPrompt(
@@ -499,10 +361,8 @@ Generate comprehensive educational insights in this JSON format:
     })
 
     if (!response.ok) {
-      // fallback to non-AI rich content path
-      return {
-        ...(await this.generateRichEducationalContent(visionData, initialInsights, recallData, artworkType))
-      } as any
+      // No fallback - require real API to work
+      throw new Error(`OpenAI API failed with status ${response.status}: ${response.statusText}`)
     }
 
     const data = await response.json()
@@ -889,15 +749,8 @@ Generate a complete educational analysis in this JSON format:
   }
 
   private async callAPIWithQualityAssessment(api: string, searchTerms: any): Promise<any> {
-    // Basic fallback data for when APIs are not available
-    return {
-      source: api,
-      data: {
-        title: 'Artwork Analysis',
-        description: 'Educational analysis of visual elements and composition',
-        confidence: 0.7
-      }
-    }
+    // No fallback data - only use real APIs
+    throw new Error(`API ${api} is not available - no mock data will be used`)
   }
 
   private processRecallResults(results: any[]): any {

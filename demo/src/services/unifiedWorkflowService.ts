@@ -235,9 +235,9 @@ class UnifiedWorkflowService {
     this.addStage('interpretation', 'Generating initial AI interpretation', ['OpenAI'])
 
     if (!this.config.enableAI.openai) {
-      this.updateStage('interpretation', 'OpenAI disabled, using fallback', [], 
-        ['Using basic analysis fallback'], Date.now() - stageStart, true)
-      return this.generateFallbackInsights(visionData)
+      this.updateStage('interpretation', 'OpenAI disabled, skipping interpretation', [], 
+        ['OpenAI required for interpretation'], Date.now() - stageStart, false, 'OpenAI API key required')
+      throw new Error('OpenAI API key required for interpretation - no mock data will be used')
     }
 
     try {
@@ -247,11 +247,10 @@ class UnifiedWorkflowService {
         Date.now() - stageStart, true)
       return insights
     } catch (error) {
-      console.warn('OpenAI interpretation failed, using fallback:', error)
-      const fallback = this.generateFallbackInsights(visionData)
-      this.updateStage('interpretation', 'OpenAI failed, using fallback', ['OpenAI'], 
-        ['Using fallback analysis'], Date.now() - stageStart, false, error instanceof Error ? error.message : 'Unknown error')
-      return fallback
+      console.warn('OpenAI interpretation failed:', error)
+      this.updateStage('interpretation', 'OpenAI failed, skipping interpretation', ['OpenAI'], 
+        ['OpenAI API failed'], Date.now() - stageStart, false, error instanceof Error ? error.message : 'Unknown error')
+      throw new Error(`OpenAI interpretation failed: ${error instanceof Error ? error.message : 'Unknown error'} - no mock data will be used`)
     }
   }
 
@@ -375,9 +374,9 @@ class UnifiedWorkflowService {
     this.addStage('synthesis', 'Generating final educational synthesis', ['OpenAI'])
 
     if (!this.config.enableAI.openai) {
-      this.updateStage('synthesis', 'OpenAI disabled, using fallback', [], 
-        ['Using basic synthesis fallback'], Date.now() - stageStart, true)
-      return this.generateFallbackSynthesis(visionData, initialInsights, recallData)
+      this.updateStage('synthesis', 'OpenAI disabled, skipping synthesis', [], 
+        ['OpenAI required for synthesis'], Date.now() - stageStart, false, 'OpenAI API key required')
+      throw new Error('OpenAI API key required for synthesis - no mock data will be used')
     }
 
     try {
@@ -386,11 +385,10 @@ class UnifiedWorkflowService {
         ['Generated comprehensive educational analysis'], Date.now() - stageStart, true)
       return synthesis
     } catch (error) {
-      console.warn('OpenAI synthesis failed, using fallback:', error)
-      const fallback = this.generateFallbackSynthesis(visionData, initialInsights, recallData)
-      this.updateStage('synthesis', 'OpenAI failed, using fallback', ['OpenAI'], 
-        ['Using fallback synthesis'], Date.now() - stageStart, false, error instanceof Error ? error.message : 'Unknown error')
-      return fallback
+      console.warn('OpenAI synthesis failed:', error)
+      this.updateStage('synthesis', 'OpenAI failed, skipping synthesis', ['OpenAI'], 
+        ['OpenAI API failed'], Date.now() - stageStart, false, error instanceof Error ? error.message : 'Unknown error')
+      throw new Error(`OpenAI synthesis failed: ${error instanceof Error ? error.message : 'Unknown error'} - no mock data will be used`)
     }
   }
 
