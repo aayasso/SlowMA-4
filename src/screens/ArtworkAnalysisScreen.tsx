@@ -13,6 +13,8 @@ import {
   Alert,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import { analyzeArtworkEducationally } from '../services/educationWorkflow';
+import { GOOGLE_VISION_KEY, MICROSOFT_VISION_KEY, MICROSOFT_VISION_ENDPOINT, OPENAI_API_KEY, CLARIFAI_API_KEY, HARVARD_ART_MUSEUMS_API_KEY } from '../services/env';
 
 interface ArtworkAnalysisScreenProps {
   navigation: any;
@@ -153,28 +155,21 @@ const ArtworkAnalysisScreen: React.FC<any> = ({ navigation, route }) => {
         setLoading(true);
         setError(null);
         
-        // Call the comprehensive educational analysis service
-        const response = await fetch('http://localhost:3000/api/analyze-comprehensive', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            imageBase64: imageUri
-          })
-        });
-
-        if (!response.ok) {
-          throw new Error(`Analysis failed: ${response.status}`);
+        const { analysis, missingKeys } = await analyzeArtworkEducationally(imageUri);
+        if (missingKeys && missingKeys.length > 0) {
+          Alert.alert(
+            'Missing API Keys',
+            `Please add these keys to your .env and rebuild the app:\n\n${missingKeys.join('\n')}`,
+            [{ text: 'OK' }]
+          );
+          throw new Error('Missing required API keys');
         }
 
-        const data = await response.json();
-        
-        if (!data.success) {
-          throw new Error(data.error || 'Analysis failed');
+        if (!analysis) {
+          throw new Error('No analysis produced');
         }
 
-        setEducationalAnalysis(data.analysis);
+        setEducationalAnalysis(analysis as any);
         
       } catch (error) {
         console.warn('API analysis failed, using mock data:', error);
