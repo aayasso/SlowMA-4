@@ -362,6 +362,7 @@ class ArtworkAnalysisService {
       if (!response.ok) {
         console.log('Met Museum API failed, trying alternative approach')
         // Try direct access (may work in some environments)
+        const targetUrl = `https://collectionapi.metmuseum.org/public/collection/v1/search?q=${encodeURIComponent(query)}&hasImages=true&isOnView=true`
         const directResponse = await fetch(targetUrl)
         if (!directResponse.ok) {
           console.log('Met Museum API unavailable, skipping Met Museum data')
@@ -696,7 +697,7 @@ You must respond with ONLY valid JSON in this exact format. Do not include any o
 
 Write with depth and sophistication while maintaining accessibility. Provide substantial, informative content that enhances understanding of art.`
 
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      const response = await fetch('/proxy/openai/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${this.apiKeys.openai}`,
@@ -1543,7 +1544,7 @@ Write with depth and sophistication while maintaining accessibility. Provide sub
   }
 
 
-  // Generate comprehensive analysis summary from all sources (exactly 40 informative sentences)
+  // Generate a structured educational walkthrough from all sources
   private generateAnalysisSummary(
     results: ArtworkAnalysis[], 
     openAIAnalysis?: OpenAIAnalysisResult | null,
@@ -1552,174 +1553,83 @@ Write with depth and sophistication while maintaining accessibility. Provide sub
     wikipediaData?: WikipediaData | null,
     similarArtworks?: ArtworkAnalysis[]
   ): string {
-    const summary: string[] = []
-    
-    // 1. Opening visual description (Vision APIs)
-    if (results.length > 0) {
-      const firstResult = results[0]
-      if (firstResult.description) {
-        summary.push(firstResult.description)
-      } else {
-        summary.push("This artwork presents a compelling visual composition that invites careful observation and analysis.")
-      }
-    } else {
-      summary.push("This artwork presents a compelling visual composition that invites careful observation and analysis.")
+    const sections: string[] = []
+
+    // Overview
+    const overview = (() => {
+      const first = results[0]
+      const base = first?.description || 'This artwork invites careful observation and analysis.'
+      return `Overview: ${base}`
+    })()
+    sections.push(overview)
+
+    // Composition and Visual Elements
+    const compParts: string[] = []
+    const firstResult = results[0]
+    if (firstResult?.elements && firstResult.elements.length > 0) {
+      compParts.push(`Key elements: ${firstResult.elements.slice(0, 3).join(', ')}.`)
     }
-    
-    // 2. Technical analysis from vision APIs
-    if (results.length > 0 && results[0].techniques && results[0].techniques.length > 0) {
-      const techniques = results[0].techniques.slice(0, 3)
-      summary.push(`The artwork demonstrates sophisticated technical mastery through ${techniques.join(', ')}.`)
-    } else {
-      summary.push("The technical execution reveals careful attention to artistic principles and skilled craftsmanship.")
+    if (openAIAnalysis?.compositionNotes) {
+      compParts.push(openAIAnalysis.compositionNotes)
     }
-    
-    // 3. Compositional elements
-    if (results.length > 0 && results[0].elements && results[0].elements.length > 0) {
-      const elements = results[0].elements.slice(0, 3)
-      summary.push(`Key compositional elements include ${elements.join(', ')}.`)
-    } else {
-      summary.push("The composition demonstrates thoughtful arrangement of visual elements that guide the viewer's eye.")
+    if (openAIAnalysis?.compositionPrinciples && openAIAnalysis.compositionPrinciples.length > 0) {
+      compParts.push(`Composition principles: ${openAIAnalysis.compositionPrinciples.slice(0, 3).join(', ')}.`)
     }
-    
-    // 4. Color analysis - dominant colors
-    if (colorAnalysis && colorAnalysis.dominantColors.length > 0) {
-      const topColors = colorAnalysis.dominantColors.slice(0, 3).map(c => c.name).join(', ')
-      summary.push(`The dominant color palette features ${topColors}, creating a visually cohesive aesthetic.`)
-    } else {
-      summary.push("The color choices demonstrate careful consideration of visual harmony and emotional impact.")
+    if (compParts.length > 0) sections.push(`Composition: ${compParts.join(' ')}`)
+
+    // Color Walkthrough
+    const colorParts: string[] = []
+    if (colorAnalysis?.dominantColors?.length) {
+      const names = colorAnalysis.dominantColors.slice(0, 3).map(c => c.name).join(', ')
+      colorParts.push(`Palette: ${names}.`)
     }
-    
-    // 5. Color temperature and mood
-    if (colorAnalysis && colorAnalysis.colorTemperature) {
-      summary.push(`The ${colorAnalysis.colorTemperature.toLowerCase()} creates a specific atmospheric quality.`)
-    } else {
-      summary.push("The color temperature contributes to the overall mood and emotional resonance of the piece.")
+    if (colorAnalysis?.colorHarmony) colorParts.push(colorAnalysis.colorHarmony)
+    if (colorAnalysis?.colorMood) colorParts.push(colorAnalysis.colorMood)
+    if (openAIAnalysis?.colorTheory) colorParts.push(openAIAnalysis.colorTheory)
+    if (colorParts.length > 0) sections.push(`Color: ${colorParts.join(' ')}`)
+
+    // Technique and Materials
+    const techniqueParts: string[] = []
+    if (firstResult?.techniques?.length) techniqueParts.push(`Techniques: ${firstResult.techniques.slice(0, 3).join(', ')}.`)
+    if (openAIAnalysis?.technicalAnalysis) techniqueParts.push(openAIAnalysis.technicalAnalysis)
+    if (techniqueParts.length > 0) sections.push(`Technique: ${techniqueParts.join(' ')}`)
+
+    // Themes and Impact
+    const themeParts: string[] = []
+    if (openAIAnalysis?.themes) themeParts.push(`Themes: ${openAIAnalysis.themes}.`)
+    if (openAIAnalysis?.emotionalImpact) themeParts.push(openAIAnalysis.emotionalImpact)
+    if (themeParts.length > 0) sections.push(`Interpretation: ${themeParts.join(' ')}`)
+
+    // Context (Museum/Wikipedia)
+    const contextParts: string[] = []
+    if (metMuseumData?.culture || metMuseumData?.objectDate) {
+      const culture = metMuseumData.culture ? `${metMuseumData.culture}` : 'cultural'
+      const period = metMuseumData.objectDate ? `${metMuseumData.objectDate}` : 'historical'
+      contextParts.push(`Context: ${culture} traditions; period ${period}.`)
     }
-    
-    // 6. Color harmony analysis
-    if (colorAnalysis && colorAnalysis.colorHarmony) {
-      summary.push(colorAnalysis.colorHarmony + " This demonstrates advanced understanding of color relationships.")
-    } else {
-      summary.push("The artist employs sophisticated color relationships that create visual harmony and balance.")
+    if (wikipediaData?.extract) {
+      contextParts.push(`Background: ${wikipediaData.extract.slice(0, 180)}${wikipediaData.extract.length > 180 ? '...' : ''}`)
     }
-    
-    // 7. Color mood and emotional impact
-    if (colorAnalysis && colorAnalysis.colorMood) {
-      summary.push(colorAnalysis.colorMood + " These choices reveal the artist's intention to evoke specific feelings.")
-    } else {
-      summary.push("The color choices work together to create a distinct emotional atmosphere that enhances the artwork's impact.")
+    if (openAIAnalysis?.culturalSignificance) contextParts.push(openAIAnalysis.culturalSignificance)
+    if (contextParts.length > 0) sections.push(contextParts.join(' '))
+
+    // Learning and Discussion
+    const learningParts: string[] = []
+    if (openAIAnalysis?.learningObjectives?.length) {
+      learningParts.push(`Objectives: ${openAIAnalysis.learningObjectives.slice(0, 3).join(', ')}.`)
     }
-    
-    // 8. OpenAI artistic insights
-    if (openAIAnalysis && openAIAnalysis.artisticInsights && openAIAnalysis.artisticInsights.length > 0) {
-      summary.push(openAIAnalysis.artisticInsights[0])
-    } else {
-      summary.push("The artwork reveals the artist's unique perspective and creative vision through thoughtful visual choices.")
+    if (openAIAnalysis?.discussionQuestions?.length) {
+      learningParts.push(`Discuss: ${openAIAnalysis.discussionQuestions.slice(0, 2).join(' | ')}.`)
     }
-    
-    // 9. Additional OpenAI insight
-    if (openAIAnalysis && openAIAnalysis.artisticInsights && openAIAnalysis.artisticInsights.length > 1) {
-      summary.push(openAIAnalysis.artisticInsights[1])
-    } else {
-      summary.push("The composition demonstrates careful planning and artistic intention in every element placement.")
-    }
-    
-    // 10. Composition and visual flow
-    if (openAIAnalysis && openAIAnalysis.compositionNotes) {
-      summary.push(openAIAnalysis.compositionNotes)
-    } else {
-      summary.push("The arrangement of visual elements creates a dynamic flow that engages the viewer throughout the composition.")
-    }
-    
-    // 11. Color theory application
-    if (openAIAnalysis && openAIAnalysis.colorTheory) {
-      summary.push(openAIAnalysis.colorTheory)
-    } else {
-      summary.push("The artist's understanding of color theory is evident in the sophisticated palette and color relationships.")
-    }
-    
-    // 12. Technical analysis from OpenAI
-    if (openAIAnalysis && openAIAnalysis.technicalAnalysis) {
-      summary.push(openAIAnalysis.technicalAnalysis)
-    } else {
-      summary.push("The technical execution reveals mastery of artistic materials and techniques appropriate to the work's purpose.")
-    }
-    
-    // 13. Themes and meaning
-    if (openAIAnalysis && openAIAnalysis.themes) {
-      summary.push(`The artwork explores themes of ${openAIAnalysis.themes.toLowerCase()}, adding depth to its visual impact.`)
-    } else {
-      summary.push("The artwork communicates meaning through its visual language, inviting viewers to engage with its underlying themes.")
-    }
-    
-    // 14. Emotional impact
-    if (openAIAnalysis && openAIAnalysis.emotionalImpact) {
-      summary.push(openAIAnalysis.emotionalImpact)
-    } else {
-      summary.push("The emotional resonance of the piece demonstrates the artist's ability to connect with viewers on a profound level.")
-    }
-    
-    // 15. Historical and cultural context from Met Museum
-    if (metMuseumData) {
-      if (metMuseumData.culture && metMuseumData.objectDate) {
-        summary.push(`Created in the ${metMuseumData.objectDate} period, this work reflects ${metMuseumData.culture} cultural traditions and artistic values.`)
-      } else if (metMuseumData.medium) {
-        summary.push(`The use of ${metMuseumData.medium.toLowerCase()} reflects traditional artistic practices and material choices.`)
-      } else {
-        summary.push("This artwork connects to broader artistic traditions and cultural contexts that enhance its significance.")
-      }
-    } else {
-      summary.push("The artwork connects to broader artistic traditions and cultural contexts that enhance its significance.")
-    }
-    
-    // 16. Material and medium analysis
-    if (metMuseumData && metMuseumData.medium) {
-      summary.push(`The choice of ${metMuseumData.medium.toLowerCase()} as the primary medium demonstrates thoughtful consideration of material properties and artistic intent.`)
-    } else {
-      summary.push("The artist's choice of materials reveals careful consideration of how different media can enhance the artwork's expressive potential.")
-    }
-    
-    // 17. Wikipedia educational context
-    if (wikipediaData && wikipediaData.extract) {
-      const extract = wikipediaData.extract.substring(0, 150).trim()
-      if (extract) {
-        summary.push(`Educational context reveals that ${extract.toLowerCase()}...`)
-      } else {
-        summary.push("The artwork contributes to our understanding of artistic traditions and cultural expression.")
-      }
-    } else {
-      summary.push("The artwork contributes to our understanding of artistic traditions and cultural expression.")
-    }
-    
-    // 18. Learning objectives and educational value
-    if (openAIAnalysis && openAIAnalysis.learningObjectives && openAIAnalysis.learningObjectives.length > 0) {
-      summary.push(`Students studying this work can develop skills in ${openAIAnalysis.learningObjectives.slice(0, 2).join(' and ')}, enhancing their artistic understanding.`)
-    } else {
-      summary.push("This artwork provides valuable learning opportunities for developing visual literacy and artistic appreciation.")
-    }
-    
-    // 19. Discussion and critical thinking
-    if (openAIAnalysis && openAIAnalysis.discussionQuestions && openAIAnalysis.discussionQuestions.length > 0) {
-      summary.push(`Engaging with this artwork through questions like "${openAIAnalysis.discussionQuestions[0]}" encourages deeper critical thinking.`)
-    } else {
-      summary.push("The artwork invites viewers to engage in critical thinking about artistic choices, cultural meaning, and personal interpretation.")
-    }
-    
-    // 20. Conclusion and significance
+    if (learningParts.length > 0) sections.push(learningParts.join(' '))
+
+    // Related Works
     if (similarArtworks && similarArtworks.length > 0) {
-      summary.push(`This artwork's significance is enhanced when considered alongside similar works, demonstrating its place within broader artistic movements.`)
-    } else {
-      summary.push("This artwork represents a meaningful contribution to visual culture, demonstrating the power of art to communicate, inspire, and transform.")
+      const samples = similarArtworks.slice(0, 2).map(a => `${a.title || 'Untitled'}${a.artist ? ' — ' + a.artist : ''}`).join('; ')
+      sections.push(`Related: ${samples}.`)
     }
-    
-    // Ensure exactly 40 sentences by padding if necessary
-    while (summary.length < 40) {
-      summary.push("The artwork continues to reveal new insights upon repeated viewing, demonstrating the depth of artistic expression.")
-    }
-    
-    // Join exactly 40 sentences
-    return summary.slice(0, 40).join(' ')
+
+    return sections.join('\n\n')
   }
 
   // Combine results from multiple APIs for richer analysis

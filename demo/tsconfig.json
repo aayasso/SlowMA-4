@@ -18,5 +18,15 @@
     "esModuleInterop": true
   },
   "include": ["src"],
+  "exclude": [
+    "src/components/OptimizedArtworkAnalysisScreen.tsx",
+    "src/components/SimplifiedArtworkAnalysisScreen.tsx",
+    "src/services/enhancedEducationalService.ts",
+    "src/services/optimizedWorkflowService.ts",
+    "src/services/unifiedWorkflowService.ts",
+    "src/services/workflowMonitor.ts",
+    "src/services/workflowTester.ts",
+    "src/services/comprehensiveEducationalService.ts"
+  ],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

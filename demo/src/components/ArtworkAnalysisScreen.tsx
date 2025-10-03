@@ -2,11 +2,10 @@ import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { ArrowLeft, Palette, Eye, AlertCircle, Droplets, BookOpen, MessageCircle, Target, Lightbulb, Search } from 'lucide-react'
 import './ArtworkAnalysisScreen.css'
-import apiService, { ArtworkAnalysis } from '../services/apiService'
+import SimplifiedOptimizedService, { SimplifiedEducationalAnalysis } from '../services/simplifiedOptimizedService'
+// Note: comprehensive service is large and optional; load it dynamically only if enabled
 
-interface ArtworkInfo extends ArtworkAnalysis {
-  analysis: string
-}
+type ArtworkInfo = SimplifiedEducationalAnalysis
 
 const ArtworkAnalysisScreen: React.FC = () => {
   const navigate = useNavigate()
@@ -33,16 +32,38 @@ const ArtworkAnalysisScreen: React.FC = () => {
         if (!imageFile) {
           throw new Error('No image file provided for analysis')
         }
+
+        const fileToBase64 = (file: File) => new Promise<string>((resolve, reject) => {
+          const reader = new FileReader()
+          reader.onload = () => {
+            const result = reader.result as string
+            // result is data:url; extract base64
+            const base64 = result.split(',')[1] || ''
+            resolve(base64)
+          }
+          reader.onerror = reject
+          reader.readAsDataURL(file)
+        })
+
+        const imageBase64 = await fileToBase64(imageFile)
+
+        // Use real API pipeline when enabled via env, otherwise fallback to simplified
+        const useRealApis = import.meta.env.VITE_USE_REAL_APIS === 'true'
+        let analysis
         
-        // Use real API analysis
-        const analysis = await apiService.analyzeArtwork(imageFile)
-        
-        const artworkData: ArtworkInfo = {
-          ...analysis,
-          analysis: analysis.description || "Take your time to observe the artwork carefully, noticing the details, colors, and composition."
+        if (useRealApis) {
+          try {
+            const mod = await import('../services/comprehensiveEducationalService')
+            analysis = await mod.default.analyzeArtworkComprehensively(imageBase64)
+          } catch (realApiError) {
+            console.warn('Real API analysis failed, falling back to simplified:', realApiError)
+            analysis = await SimplifiedOptimizedService.analyzeArtworkSimplified(imageBase64)
+          }
+        } else {
+          analysis = await SimplifiedOptimizedService.analyzeArtworkSimplified(imageBase64)
         }
-        
-        setArtworkInfo(artworkData)
+
+        setArtworkInfo(analysis)
       } catch (err) {
         console.error('Analysis error:', err)
         setError(err instanceof Error ? err.message : 'Failed to analyze artwork. Please try again.')
@@ -103,18 +124,150 @@ const ArtworkAnalysisScreen: React.FC = () => {
             
             {/* Analysis source and confidence */}
             <div className="analysis-meta">
-              <span className="source">Source: {artworkInfo.source}</span>
+              <span className="source">Sources: {artworkInfo.sources?.join(', ') || 'Multiple'}</span>
               {artworkInfo.confidence && (
-                <span className="confidence">
-                  Confidence: {Math.round(artworkInfo.confidence * 100)}%
-                </span>
+                <span className="confidence">Confidence: {Math.round(artworkInfo.confidence * 100)}%</span>
               )}
             </div>
-            
-            <div className="section">
-              <h3 className="section-title">Visual Analysis</h3>
-              <p className="description">{artworkInfo.description}</p>
-            </div>
+
+            {/* Style Analysis */}
+            {artworkInfo.styleAnalysis && (
+              <div className="section">
+                <h3 className="section-title">Style Analysis</h3>
+                <p className="description"><strong>Primary Style:</strong> {artworkInfo.styleAnalysis.primaryStyle}</p>
+                {artworkInfo.styleAnalysis.styleCharacteristics?.length > 0 && (
+                  <div className="subsection">
+                    <h4 className="subsection-title">Characteristics</h4>
+                    <ul className="bullet-list">
+                      {artworkInfo.styleAnalysis.styleCharacteristics.map((c, i) => (
+                        <li key={i}>{c}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {artworkInfo.styleAnalysis.educationalInsights?.length > 0 && (
+                  <div className="subsection">
+                    <h4 className="subsection-title">Educational Insights</h4>
+                    <ul className="bullet-list">
+                      {artworkInfo.styleAnalysis.educationalInsights.map((c, i) => (
+                        <li key={i}>{c}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Technique Analysis */}
+            {artworkInfo.techniqueAnalysis && (
+              <div className="section">
+                <h3 className="section-title">Technique Analysis</h3>
+                {artworkInfo.techniqueAnalysis.primaryTechniques?.length > 0 && (
+                  <div className="subsection">
+                    <h4 className="subsection-title">Primary Techniques</h4>
+                    <ul className="bullet-list">
+                      {artworkInfo.techniqueAnalysis.primaryTechniques.map((t, i) => (
+                        <li key={i}>{t}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {artworkInfo.techniqueAnalysis.educationalValue?.length > 0 && (
+                  <div className="subsection">
+                    <h4 className="subsection-title">Educational Value</h4>
+                    <ul className="bullet-list">
+                      {artworkInfo.techniqueAnalysis.educationalValue.map((t, i) => (
+                        <li key={i}>{t}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Color Analysis */}
+            {artworkInfo.colorAnalysis && (
+              <div className="section">
+                <h3 className="section-title">Color Analysis</h3>
+                {artworkInfo.colorAnalysis.colorHarmony && (
+                  <p className="description"><strong>Harmony:</strong> {artworkInfo.colorAnalysis.colorHarmony}</p>
+                )}
+                {artworkInfo.colorAnalysis.emotionalImpact && (
+                  <p className="description"><strong>Emotional Impact:</strong> {artworkInfo.colorAnalysis.emotionalImpact}</p>
+                )}
+                {artworkInfo.colorAnalysis.colorTheory?.length > 0 && (
+                  <div className="subsection">
+                    <h4 className="subsection-title">Color Theory</h4>
+                    <ul className="bullet-list">
+                      {artworkInfo.colorAnalysis.colorTheory.map((t, i) => (
+                        <li key={i}>{t}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Artistic Movements */}
+            {artworkInfo.artisticMovements?.length > 0 && (
+              <div className="section">
+                <h3 className="section-title">Artistic Movements</h3>
+                <ul className="bullet-list">
+                  {artworkInfo.artisticMovements.map((m, i) => (
+                    <li key={i}><strong>{m.name}</strong> — {m.timePeriod}. {m.educationalRelevance}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Visual Elements */}
+            {artworkInfo.visualElements?.length > 0 && (
+              <div className="section">
+                <h3 className="section-title">Visual Elements</h3>
+                <ul className="bullet-list">
+                  {artworkInfo.visualElements.map((e, i) => (
+                    <li key={i}><strong>{e.element}:</strong> {e.description} — {e.educationalValue}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Historical Context */}
+            {artworkInfo.historicalContext && (
+              <div className="section">
+                <h3 className="section-title">Historical Context</h3>
+                <p className="description"><strong>Time Period:</strong> {artworkInfo.historicalContext.timePeriod}</p>
+                <p className="description"><strong>Cultural Background:</strong> {artworkInfo.historicalContext.culturalBackground}</p>
+                <p className="description"><strong>Artistic Climate:</strong> {artworkInfo.historicalContext.artisticClimate}</p>
+              </div>
+            )}
+
+            {/* Key Concepts & Vocabulary */}
+            {artworkInfo.learningResources && (
+              <div className="section">
+                <h3 className="section-title">Key Concepts & Vocabulary</h3>
+                {artworkInfo.learningResources.keyConcepts?.length > 0 && (
+                  <div className="subsection">
+                    <h4 className="subsection-title">Key Concepts</h4>
+                    <ul className="bullet-list">
+                      {artworkInfo.learningResources.keyConcepts.map((c, i) => (
+                        <li key={i}>{c}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {artworkInfo.learningResources.vocabulary?.length > 0 && (
+                  <div className="subsection">
+                    <h4 className="subsection-title">Vocabulary</h4>
+                    <ul className="bullet-list">
+                      {artworkInfo.learningResources.vocabulary.map((c, i) => (
+                        <li key={i}>{c}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>

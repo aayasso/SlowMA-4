@@ -10,6 +10,33 @@ export default defineConfig(({ mode }) => {
       port: 3000,
       open: true,
       proxy: {
+        '/proxy/openai': {
+          target: 'https://api.openai.com',
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/proxy\/openai/, ''),
+          headers: (env.VITE_OPENAI_API_KEY
+            ? { Authorization: `Bearer ${env.VITE_OPENAI_API_KEY}` }
+            : undefined) as any
+        },
+        '/proxy/google': {
+          target: 'https://vision.googleapis.com',
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/proxy\/google/, '')
+        },
+        '/proxy/msvision': {
+          // Endpoint must end with /
+          target: env.VITE_MICROSOFT_VISION_ENDPOINT || 'https://example.invalid/',
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/proxy\/msvision\/?/, ''),
+          headers: (env.VITE_MICROSOFT_VISION_API_KEY
+            ? { 'Ocp-Apim-Subscription-Key': env.VITE_MICROSOFT_VISION_API_KEY }
+            : undefined) as any
+        },
+        '/proxy/harvard': {
+          target: 'https://api.harvardartmuseums.org',
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/proxy\/harvard/, '')
+        },
         '/proxy/artsearch': {
           target: 'https://api.artsearch.io',
           changeOrigin: true,
