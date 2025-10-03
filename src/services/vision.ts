@@ -1,6 +1,4 @@
-import Config from "react-native-config";
-
-const GOOGLE_KEY: string | undefined = Config.GOOGLE_VISION_KEY;
+import { GOOGLE_VISION_KEY as GOOGLE_KEY } from "./env";
 
 export interface VisionResponse {
 	responses: {
