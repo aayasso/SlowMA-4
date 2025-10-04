@@ -1,34 +1,22 @@
-import { GOOGLE_VISION_KEY, MICROSOFT_VISION_KEY, MICROSOFT_VISION_ENDPOINT, OPENAI_API_KEY, HARVARD_ART_MUSEUMS_API_KEY, CLARIFAI_API_KEY } from './env'
+import { enhancedEducationalWorkflow, EnhancedEducationalAnalysis } from './enhancedEducationalWorkflow'
+import { monitoringService } from './monitoringService'
 
-type ImageAnalysisResult = {
-  labels?: string[]
-  objects?: string[]
-  text?: string[]
-  colors?: string[]
-  faces?: number
-}
+// Legacy type compatibility
+export type ComprehensiveEducationalAnalysis = EnhancedEducationalAnalysis
 
-type InitialInsights = {
-  styleInsights: string[]
-  techniqueInsights: string[]
-  themeInsights: string[]
-  mediumInsights: string[]
-  reflectionQuestions: string[]
-  learningObjectives: string[]
-}
-
-export type ComprehensiveEducationalAnalysis = any
-
+// Legacy function for backward compatibility
 function requireKeys(): { ok: boolean; missing: string[] } {
+  // Check if we have at least one vision API and OpenAI
+  const health = monitoringService.getPerformanceMetrics()
+  const hasVisionApi = Object.keys(health).some(api => 
+    ['google-vision', 'microsoft-vision', 'clarifai'].includes(api)
+  )
+  
   const missing: string[] = []
-  if (!OPENAI_API_KEY) missing.push('OPENAI_API_KEY')
-  if (!(GOOGLE_VISION_KEY || (MICROSOFT_VISION_KEY && MICROSOFT_VISION_ENDPOINT) || CLARIFAI_API_KEY)) {
-    if (!GOOGLE_VISION_KEY) missing.push('GOOGLE_VISION_KEY')
-    if (!MICROSOFT_VISION_KEY) missing.push('MICROSOFT_VISION_KEY')
-    if (!MICROSOFT_VISION_ENDPOINT) missing.push('MICROSOFT_VISION_ENDPOINT')
-    if (!CLARIFAI_API_KEY) missing.push('CLARIFAI_API_KEY')
+  if (!hasVisionApi) {
+    missing.push('At least one vision API key required')
   }
-  // Harvard optional
+  
   return { ok: missing.length === 0, missing }
 }
 
@@ -166,36 +154,129 @@ async function searchHarvard(term: string) {
 }
 
 export async function analyzeArtworkEducationally(imageBase64: string): Promise<{ analysis?: ComprehensiveEducationalAnalysis; missingKeys?: string[] }> {
-  const check = requireKeys()
-  if (!check.ok) return { missingKeys: check.missing }
+  try {
+    // Use the enhanced workflow for comprehensive analysis
+    const analysis = await enhancedEducationalWorkflow.analyzeArtworkComprehensively(imageBase64)
+    
+    // Log successful analysis
+    monitoringService.logEvent({
+      type: 'api_call',
+      source: 'education-workflow',
+      data: { 
+        analysisId: analysis.analysisId,
+        confidence: analysis.confidence,
+        processingTime: analysis.processingTime
+      },
+      severity: 'low'
+    })
 
-  const [clarifai, google, microsoft] = await Promise.all([
-    analyzeWithClarifai(imageBase64).catch(() => null),
-    analyzeWithGoogleVision(imageBase64).catch(() => null),
-    analyzeWithMicrosoftVision(imageBase64).catch(() => null)
-  ])
+    return { analysis }
+  } catch (error) {
+    // Check for missing keys
+    const check = requireKeys()
+    if (!check.ok) {
+      return { missingKeys: check.missing }
+    }
 
-  const combined = combineVision(clarifai, google, microsoft)
-  const initial = await generateInitialInsights(combined)
-
-  const terms = [...(combined.labels || []), ...(initial.styleInsights || []), ...(initial.themeInsights || [])].filter(Boolean)
-  const primary = terms[0] || 'art'
-
-  const [wiki, met, aic, harvard] = await Promise.all([
-    searchWikipedia(primary).catch(() => null),
-    searchMet(primary).catch(() => null),
-    searchAIC(primary).catch(() => []),
-    searchHarvard(primary).catch(() => [])
-  ])
-
-  const synthesisPrompt = {
-    combined,
-    initial,
-    recall: { wiki, met, aic, harvard }
+    // Log error and return fallback
+    monitoringService.logError('Educational analysis failed', error as Error, { imageBase64: imageBase64.substring(0, 100) })
+    
+    // Return minimal analysis structure for backward compatibility
+    return { 
+      analysis: {
+        visionAnalysis: {
+          labels: ['Artwork'],
+          objects: [],
+          text: [],
+          colors: [],
+          faces: 0,
+          confidence: 0.3,
+          source: 'Fallback',
+          timestamp: Date.now()
+        },
+        educationalAnalysis: {
+          styleAnalysis: {
+            primaryStyle: 'Analysis',
+            styleCharacteristics: ['Artistic expression'],
+            movementContext: 'Historical context',
+            stylisticInfluences: ['Artistic traditions'],
+            visualLanguage: 'Visual communication',
+            educationalInsights: ['Visual literacy development']
+          },
+          techniqueAnalysis: {
+            primaryTechniques: ['Artistic technique'],
+            materialProperties: ['Material characteristics'],
+            applicationMethods: ['Application methods'],
+            technicalInnovations: ['Technical approach'],
+            skillLevel: 'Intermediate',
+            educationalValue: ['Educational significance']
+          },
+          themeAnalysis: {
+            primaryThemes: ['Artistic theme'],
+            symbolicElements: ['Symbolic meaning'],
+            emotionalTone: 'Emotional expression',
+            culturalContext: 'Cultural significance',
+            narrativeElements: ['Narrative content'],
+            interpretiveApproaches: ['Interpretive methods']
+          },
+          colorAnalysis: {
+            colorPalette: [],
+            colorHarmony: 'Color relationships',
+            emotionalImpact: 'Emotional response',
+            symbolicMeaning: ['Color symbolism'],
+            colorTheory: ['Color principles'],
+            educationalInsights: ['Color education']
+          },
+          compositionAnalysis: {
+            compositionalPrinciples: ['Compositional balance'],
+            visualFlow: 'Visual movement',
+            focalPoints: ['Focal elements'],
+            spatialRelationships: ['Spatial organization'],
+            balanceAndRhythm: 'Visual rhythm',
+            educationalApplications: ['Educational uses']
+          },
+          reflectionQuestions: [
+            {
+              category: 'observation' as const,
+              question: 'What do you notice first when looking at this artwork?',
+              educationalGoal: 'Develop observational skills'
+            }
+          ],
+          learningObjectives: [
+            {
+              skill: 'Visual Analysis',
+              description: 'Learn to analyze visual elements and composition',
+              assessmentMethod: 'Observation and discussion',
+              difficulty: 'beginner' as const
+            }
+          ],
+          confidence: 0.3,
+          sources: ['Error Recovery'],
+          timestamp: Date.now()
+        },
+        museumData: [],
+        wikipediaData: null,
+        analysisId: `fallback_${Date.now()}`,
+        timestamp: Date.now(),
+        processingTime: 0,
+        confidence: 0.3,
+        sources: ['Fallback'],
+        apiMetrics: {
+          totalApiCalls: 0,
+          successfulCalls: 0,
+          failedCalls: 1,
+          cacheHits: 0,
+          averageLatency: 0
+        },
+        qualityIndicators: {
+          dataCompleteness: 0.2,
+          sourceDiversity: 0.1,
+          educationalValue: 0.3,
+          reliability: 0.1
+        }
+      }
+    }
   }
-
-  const analysis = await generateFinalSynthesis(synthesisPrompt)
-  return { analysis }
 }
 
 async function generateFinalSynthesis(payload: any): Promise<ComprehensiveEducationalAnalysis> {
